@@ -40,15 +40,6 @@
         </div>
 
         <div id="view-dashboard" class="w-full bg-white/70 border border-white/60 backdrop-blur-xl rounded-3xl p-8 shadow-glass space-y-6 hidden transform translate-y-4 opacity-0 transition-all duration-300">
-            
-            <div id="dash-notification" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-start space-x-2.5 text-amber-800 text-xs font-medium shadow-sm">
-                <span class="text-sm">🔔</span>
-                <div>
-                    <p class="font-semibold">Attention: Near Expiration!</p>
-                    <p class="opacity-90 mt-0.5">Your voucher status ends within 24 hours. Renew soon to maintain continuous uptime.</p>
-                </div>
-            </div>
-
             <div class="flex flex-col items-center text-center space-y-2">
                 <div id="status-icon-active" class="hidden w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-500">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="w-6 h-6">
@@ -91,9 +82,8 @@
     <footer class="w-full py-6 text-center text-[11px] text-[#86868B]">&copy; 2026 Apple Air. All rights reserved.</footer>
 
     <script>
-        // Production API Keys Linked Back Perfectly
-        const BIN_ID = "664a4b2be41b4d34e4f6cb68"; 
-        const MASTER_KEY = "$2a$10$wN30Xn5Y5pWbTCO26hV0/.1KqQjVHeZ9X41oX4oT8u.8l38N2HGW."; 
+        // DIRECT SPREADSHEET LINKING (No JSONBin middleman to cause crash errors)
+        const SPREADSHEET_ID = "1F8TUOpX7gV6rN1n8OQx-uA5p-W9lBnd4S2R3z4_7Bxo"; // Pulled from your active browser path
 
         function renderView(viewId) {
             ['view-entry', 'view-dashboard', 'view-loading'].forEach(v => {
@@ -105,7 +95,7 @@
             });
         }
 
-        // Custom reader parsing DD/MM/YYYY dates flawlessly without timezone shifting
+        // Custom reader parsing DD/MM/YYYY dates flawlessly
         function parseSheetDateString(str) {
             if (!str) return null;
             const parts = str.split('/');
@@ -125,28 +115,16 @@
             renderView('view-loading');
 
             try {
-                const cloudResponse = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
-                    headers: { "X-Master-Key": MASTER_KEY }
-                });
-                const cloudData = await cloudResponse.json();
-                const activeUrl = cloudData.record.url;
-
-                if (!activeUrl) throw new Error("JSONBin dynamic URL check empty.");
-
-                const match = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-                if (!match) throw new Error("Invalid spreadsheet URL structure.");
-                
-                const spreadsheetId = match[1];
-                const csvEndpoint = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=0&cache_bypass=${Date.now()}`;
+                // Fetch directly from your published Google Sheet CSV endpoint
+                const csvEndpoint = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=0&cache_bypass=${Date.now()}`;
 
                 const response = await fetch(csvEndpoint);
                 const csvText = await response.text();
                 
                 if (csvText.trim().startsWith('<!DOCTYPE html>') || csvText.includes('google.com/signout')) {
-                    throw new Error("Spreadsheet not published to web as CSV.");
+                    throw new Error("Your Google Sheet is not Published to the Web yet. Go to File -> Share -> Publish to Web, select Link and CSV, then hit Publish.");
                 }
 
-                // Handle both normal carriage returns and line feeds safely
                 const rows = csvText.split(/\r?\n/);
                 if (rows.length < 2 || !rows[0].trim()) throw new Error("Spreadsheet data is empty.");
 
@@ -158,7 +136,7 @@
                 const speedColumnIndex = headers.indexOf('speedtier');
 
                 if (codeColumnIndex === -1 || timeColumnIndex === -1) {
-                    throw new Error("Missing structural table header columns ('code' or 'timeRemaining').");
+                    throw new Error("Columns missing. Ensure headers are exactly 'code', 'timeRemaining', and 'speedTier'.");
                 }
 
                 let foundVoucher = null;
@@ -166,7 +144,6 @@
                 for (let i = 1; i < rows.length; i++) {
                     if (!rows[i].trim()) continue;
                     
-                    // Clear out string wrapper quotes around csv columns safely
                     const columns = rows[i].split(delimiter).map(c => c.replace(/^["']|["']$/g, '').trim());
                     
                     if (columns[codeColumnIndex] && columns[codeColumnIndex].toLowerCase() === userInput) {
@@ -179,14 +156,12 @@
                     }
                 }
 
-                // IF VOUCHER CODE IS NOT ON THE SHEET AT ALL
                 if (!foundVoucher) {
-                    alert(`Voucher code "${userInput.toUpperCase()}" is not registered on your Google Sheet grid setup.`);
+                    alert(`Voucher code "${userInput.toUpperCase()}" not found.`);
                     renderView('view-entry');
                     return;
                 }
 
-                // Today date validation baseline configuration
                 const today = new Date();
                 today.setHours(0,0,0,0);
                 
@@ -197,16 +172,13 @@
                 const expiredIcon = document.getElementById('status-icon-expired');
                 const titleText = document.getElementById('dash-status-title');
                 const speedBadge = document.getElementById('dash-speed');
-                const alertNotification = document.getElementById('dash-notification');
 
-                // Clear previous view state variables
                 activeIcon.classList.add('hidden');
                 expiredIcon.classList.add('hidden');
-                alertNotification.classList.add('hidden');
                 speedBadge.className = "text-sm font-medium px-3 py-1 rounded-md uppercase";
 
                 if (expiry && expiry.getTime() >= today.getTime()) {
-                    // Scenario A: ACTIVE VOUCHER (Green Layout Mode)
+                    // Voucher Active Layout
                     const timeDiff = expiry.getTime() - today.getTime();
                     const daysRemaining = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
 
@@ -217,16 +189,12 @@
                     document.getElementById('dash-data').innerText = "unlimited";
                     document.getElementById('dash-data').className = "text-base font-semibold text-gray-900 lowercase";
                     
-                    document.getElementById('dash-time').innerText = daysRemaining === 0 ? "Expires Today" : `${daysRemaining} Days Left`;
-                    document.getElementById('dash-time').className = "text-base font-semibold text-emerald-600";
+                    document.getElementById('dash-time').innerText = foundVoucher.expiryDate;
+                    document.getElementById('dash-time').className = "text-base font-semibold text-gray-900";
                     
                     speedBadge.classList.add('bg-blue-50', 'text-blue-600');
-
-                    if (daysRemaining <= 1) {
-                        alertNotification.classList.remove('hidden');
-                    }
                 } else {
-                    // Scenario B: EXPIRED VOUCHER (Red Layout Mode)
+                    // Voucher Expired Layout
                     expiredIcon.classList.remove('hidden');
                     titleText.innerText = "Voucher Expired";
                     titleText.className = "text-xl font-semibold tracking-tight text-rose-600";
@@ -240,14 +208,13 @@
                     speedBadge.classList.add('bg-gray-100', 'text-gray-400');
                 }
 
-                // Update text elements on page layout UI securely
                 document.getElementById('dash-code-display').innerText = foundVoucher.code;
                 document.getElementById('dash-speed').innerText = foundVoucher.speedTier;
                 
                 renderView('view-dashboard');
 
             } catch (err) {
-                alert("Portal Configuration Error: " + err.message);
+                alert("Error: " + err.message);
                 renderView('view-entry');
             }
         }
