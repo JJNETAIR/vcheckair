@@ -82,7 +82,7 @@
     <footer class="w-full py-6 text-center text-[11px] text-[#86868B]">&copy; 2026 Apple Air. All rights reserved.</footer>
 
     <script>
-        // MATCHED DIRECTLY TO YOUR RESIDENT SHEET URL ID
+        // MATCHED DIRECTLY TO YOUR SHEET ID
         const SPREADSHEET_ID = "1F8TUOpX7gV6rN1n8OQx-uA5p-W9lBnd4S2R3z4_7Bxo"; 
 
         function renderView(viewId) {
@@ -114,42 +114,37 @@
             renderView('view-loading');
 
             try {
-                // Modified spreadsheet endpoint targeting structural fallback configurations
-                const csvEndpoint = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet1&cache_bypass=${Date.now()}`;
+                // UNIVERSAL PROXY ENDPOINT: Reads public text data securely without needing general access token keys
+                const csvEndpoint = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&id=${SPREADSHEET_ID}&gid=0&cache_bypass=${Date.now()}`;
 
                 const response = await fetch(csvEndpoint);
-                const csvText = await response.text();
                 
-                console.log("Raw Sheet Response Payload Data:", csvText);
+                if (!response.ok) {
+                    throw new Error("Google blocked the access pipeline. Let's process fallback rules.");
+                }
+
+                const csvText = await response.text();
 
                 if (!csvText || csvText.trim().startsWith('<!DOCTYPE html>') || csvText.includes('google.com/signout')) {
-                    throw new Error("Access Blocked. Double check that 'Anyone with the link' is enabled in your Google Sheet blue Share settings menu.");
+                    throw new Error("Private Layout Warning. Open your Google Sheet, click the blue Share button, and set General Access to 'Anyone with the link'!");
                 }
 
                 const rows = csvText.split(/\r?\n/);
-                if (rows.length < 1 || !rows[0].trim()) throw new Error("Spreadsheet parsed content empty.");
-
                 let delimiter = rows[0].includes(';') ? ';' : ',';
-                
-                // Enhanced header parser removing structural noise/quotes cleanly
                 const headers = rows[0].split(delimiter).map(h => h.replace(/^["']|["']$/g, '').trim().toLowerCase());
                 
-                console.log("Parsed Columns List:", headers);
-
                 const codeColumnIndex = headers.indexOf('code');
                 const timeColumnIndex = headers.indexOf('timeremaining');
                 const speedColumnIndex = headers.indexOf('speedtier');
 
-                // Structural fallback loop if column headers have hidden spaces or quote boxes
                 if (codeColumnIndex === -1 || timeColumnIndex === -1) {
-                    throw new Error("Column header mismatch. Make sure Row 1 matches exactly: code, timeRemaining, speedTier");
+                    throw new Error("Column structural header read mismatch.");
                 }
 
                 let foundVoucher = null;
 
                 for (let i = 1; i < rows.length; i++) {
                     if (!rows[i].trim()) continue;
-                    
                     const columns = rows[i].split(delimiter).map(c => c.replace(/^["']|["']$/g, '').trim());
                     
                     if (columns[codeColumnIndex] && columns[codeColumnIndex].toLowerCase() === userInput) {
@@ -163,7 +158,7 @@
                 }
 
                 if (!foundVoucher) {
-                    alert(`Voucher code "${userInput.toUpperCase()}" not found inside current data records.`);
+                    alert(`Voucher code "${userInput.toUpperCase()}" is not registered on your Google Sheet grid setup.`);
                     renderView('view-entry');
                     return;
                 }
@@ -218,7 +213,7 @@
                 renderView('view-dashboard');
 
             } catch (err) {
-                alert("Data Fetch Notice: " + err.message);
+                alert("Notice: " + err.message);
                 renderView('view-entry');
             }
         }
