@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Apple Air - Voucher Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', 'sans-serif'] },
+                    boxShadow: { 'apple': '0 4px 30px rgba(0, 0, 0, 0.03)', 'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.06)' }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-[#F5F5F7] text-[#1D1D1F] min-h-screen flex flex-col justify-between">
+    
+    <header class="w-full py-6 px-8 flex justify-center items-center">
+        <div class="flex items-center space-x-2">
+            <div class="w-8 h-8 rounded-lg bg-white/40 border border-white/60 backdrop-blur-md shadow-apple flex items-center justify-center">
+                <span class="text-xs font-semibold opacity-60"></span>
+            </div>
+            <span class="text-sm font-medium tracking-tight text-[#86868B]">Apple Air</span>
+        </div>
+    </header>
+
+    <main class="w-full max-w-md mx-auto px-6 flex-grow flex flex-col justify-center items-center">
+        <div id="view-entry" class="w-full bg-white/70 border border-white/60 backdrop-blur-xl rounded-3xl p-8 shadow-glass space-y-8">
+            <div class="text-center space-y-2">
+                <h1 class="text-2xl font-semibold tracking-tight">Internet Voucher</h1>
+                <p class="text-sm text-[#86868B]">Enter your access code to view connection data and validity.</p>
+            </div>
+            <div class="space-y-4">
+                <input type="text" id="voucher-input" placeholder="e.g. 123456" autocomplete="off" class="w-full px-5 py-4 bg-white/50 border border-gray-200 rounded-2xl text-base font-medium text-center uppercase focus:outline-none focus:border-blue-500 focus:bg-white shadow-inner">
+                <button onclick="streamLiveVerification()" class="w-full py-4 bg-[#0071E3] hover:bg-[#0077ED] text-white font-medium rounded-2xl shadow-md">Check Validity</button>
+            </div>
+        </div>
+
+        <div id="view-dashboard" class="w-full bg-white/70 border border-white/60 backdrop-blur-xl rounded-3xl p-8 shadow-glass space-y-6 hidden transform translate-y-4 opacity-0 transition-all duration-300">
+            
+            <div id="dash-notification" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-start space-x-2.5 text-amber-800 text-xs font-medium shadow-sm">
+                <span class="text-sm">🔔</span>
+                <div>
+                    <p class="font-semibold">Attention: Near Expiration!</p>
+                    <p class="opacity-90 mt-0.5">Your voucher status ends within 24 hours. Renew soon to maintain continuous uptime.</p>
+                </div>
+            </div>
+
+            <div class="flex flex-col items-center text-center space-y-2">
+                <div id="status-icon-active" class="hidden w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    </svg>
+                </div>
+                <div id="status-icon-expired" class="hidden w-12 h-12 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </div>
+                
+                <h2 id="dash-status-title" class="text-xl font-semibold tracking-tight">Voucher Status</h2>
+                <p id="dash-code-display" class="text-xs font-mono bg-gray-100 text-gray-600 px-3 py-1 rounded-full uppercase tracking-wider">CODE</p>
+            </div>
+
+            <div class="bg-white/50 border border-gray-100 rounded-2xl overflow-hidden divide-y divide-gray-100 shadow-inner">
+                <div class="flex justify-between items-center px-5 py-4">
+                    <span class="text-sm font-medium text-[#86868B]">Time Remaining</span>
+                    <span id="dash-time" class="text-base font-semibold">--</span>
+                </div>
+                <div class="flex justify-between items-center px-5 py-4">
+                    <span class="text-sm font-medium text-[#86868B]">Data Allowance</span>
+                    <span id="dash-data" class="text-base font-semibold">--</span>
+                </div>
+                <div class="flex justify-between items-center px-5 py-4">
+                    <span class="text-sm font-medium text-[#86868B]">Speed Tier</span>
+                    <span id="dash-speed" class="text-sm font-medium px-3 py-1 rounded-md uppercase">--</span>
+                </div>
+            </div>
+            <button onclick="backToEntryView()" class="w-full py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-2xl">Check Another Voucher</button>
+        </div>
+
+        <div id="view-loading" class="hidden flex flex-col items-center space-y-4">
+            <div class="w-8 h-8 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin"></div>
+            <p class="text-xs font-medium text-[#86868B]">Streaming data from cloud network sync...</p>
+        </div>
+    </main>
+
+    <footer class="w-full py-6 text-center text-[11px] text-[#86868B]">&copy; 2026 Apple Air. All rights reserved.</footer>
+
+    <script>
+        // Production API Keys Linked Back Perfectly
+        const BIN_ID = "664a4b2be41b4d34e4f6cb68"; 
+        const MASTER_KEY = "$2a$10$wN30Xn5Y5pWbTCO26hV0/.1KqQjVHeZ9X41oX4oT8u.8l38N2HGW."; 
+
+        function renderView(viewId) {
+            ['view-entry', 'view-dashboard', 'view-loading'].forEach(v => {
+                const el = document.getElementById(v);
+                if (v === viewId) {
+                    el.classList.remove('hidden');
+                    setTimeout(() => el.classList.remove('opacity-0', 'translate-y-4'), 20);
+                } else { el.classList.add('hidden', 'opacity-0', 'translate-y-4'); }
+            });
+        }
+
+        // Custom reader parsing DD/MM/YYYY dates flawlessly without timezone shifting
+        function parseSheetDateString(str) {
+            if (!str) return null;
+            const parts = str.split('/');
+            if (parts.length === 3) {
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10) - 1; 
+                const year = parseInt(parts[2], 10);
+                return new Date(year, month, day);
+            }
+            return new Date(str);
+        }
+
+        async function streamLiveVerification() {
+            const userInput = document.getElementById('voucher-input').value.trim().toLowerCase();
+            if (!userInput) return alert('Please enter a voucher code.');
+
+            renderView('view-loading');
+
+            try {
+                const cloudResponse = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    headers: { "X-Master-Key": MASTER_KEY }
+                });
+                const cloudData = await cloudResponse.json();
+                const activeUrl = cloudData.record.url;
+
+                if (!activeUrl) throw new Error("JSONBin dynamic URL check empty.");
+
+                const match = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+                if (!match) throw new Error("Invalid spreadsheet URL structure.");
+                
+                const spreadsheetId = match[1];
+                const csvEndpoint = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=0&cache_bypass=${Date.now()}`;
+
+                const response = await fetch(csvEndpoint);
+                const csvText = await response.text();
+                
+                if (csvText.trim().startsWith('<!DOCTYPE html>') || csvText.includes('google.com/signout')) {
+                    throw new Error("Spreadsheet not published to web as CSV.");
+                }
+
+                // Handle both normal carriage returns and line feeds safely
+                const rows = csvText.split(/\r?\n/);
+                if (rows.length < 2 || !rows[0].trim()) throw new Error("Spreadsheet data is empty.");
+
+                let delimiter = rows[0].includes(';') ? ';' : ',';
+                const headers = rows[0].split(delimiter).map(h => h.replace(/^["']|["']$/g, '').trim().toLowerCase());
+                
+                const codeColumnIndex = headers.indexOf('code');
+                const timeColumnIndex = headers.indexOf('timeremaining');
+                const speedColumnIndex = headers.indexOf('speedtier');
+
+                if (codeColumnIndex === -1 || timeColumnIndex === -1) {
+                    throw new Error("Missing structural table header columns ('code' or 'timeRemaining').");
+                }
+
+                let foundVoucher = null;
+
+                for (let i = 1; i < rows.length; i++) {
+                    if (!rows[i].trim()) continue;
+                    
+                    // Clear out string wrapper quotes around csv columns safely
+                    const columns = rows[i].split(delimiter).map(c => c.replace(/^["']|["']$/g, '').trim());
+                    
+                    if (columns[codeColumnIndex] && columns[codeColumnIndex].toLowerCase() === userInput) {
+                        foundVoucher = {
+                            code: columns[codeColumnIndex].toUpperCase(),
+                            expiryDate: columns[timeColumnIndex] || '',
+                            speedTier: columns[speedColumnIndex] || 'HIGH'
+                        };
+                        break;
+                    }
+                }
+
+                // IF VOUCHER CODE IS NOT ON THE SHEET AT ALL
+                if (!foundVoucher) {
+                    alert(`Voucher code "${userInput.toUpperCase()}" is not registered on your Google Sheet grid setup.`);
+                    renderView('view-entry');
+                    return;
+                }
+
+                // Today date validation baseline configuration
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                
+                const expiry = parseSheetDateString(foundVoucher.expiryDate);
+                if (expiry) expiry.setHours(0,0,0,0);
+
+                const activeIcon = document.getElementById('status-icon-active');
+                const expiredIcon = document.getElementById('status-icon-expired');
+                const titleText = document.getElementById('dash-status-title');
+                const speedBadge = document.getElementById('dash-speed');
+                const alertNotification = document.getElementById('dash-notification');
+
+                // Clear previous view state variables
+                activeIcon.classList.add('hidden');
+                expiredIcon.classList.add('hidden');
+                alertNotification.classList.add('hidden');
+                speedBadge.className = "text-sm font-medium px-3 py-1 rounded-md uppercase";
+
+                if (expiry && expiry.getTime() >= today.getTime()) {
+                    // Scenario A: ACTIVE VOUCHER (Green Layout Mode)
+                    const timeDiff = expiry.getTime() - today.getTime();
+                    const daysRemaining = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+
+                    activeIcon.classList.remove('hidden');
+                    titleText.innerText = "Voucher Active";
+                    titleText.className = "text-xl font-semibold tracking-tight text-emerald-600";
+                    
+                    document.getElementById('dash-data').innerText = "unlimited";
+                    document.getElementById('dash-data').className = "text-base font-semibold text-gray-900 lowercase";
+                    
+                    document.getElementById('dash-time').innerText = daysRemaining === 0 ? "Expires Today" : `${daysRemaining} Days Left`;
+                    document.getElementById('dash-time').className = "text-base font-semibold text-emerald-600";
+                    
+                    speedBadge.classList.add('bg-blue-50', 'text-blue-600');
+
+                    if (daysRemaining <= 1) {
+                        alertNotification.classList.remove('hidden');
+                    }
+                } else {
+                    // Scenario B: EXPIRED VOUCHER (Red Layout Mode)
+                    expiredIcon.classList.remove('hidden');
+                    titleText.innerText = "Voucher Expired";
+                    titleText.className = "text-xl font-semibold tracking-tight text-rose-600";
+                    
+                    document.getElementById('dash-data').innerText = "Inactive";
+                    document.getElementById('dash-data').className = "text-base font-semibold text-rose-600";
+
+                    document.getElementById('dash-time').innerText = foundVoucher.expiryDate || 'Expired';
+                    document.getElementById('dash-time').className = "text-base font-semibold text-rose-600";
+                    
+                    speedBadge.classList.add('bg-gray-100', 'text-gray-400');
+                }
+
+                // Update text elements on page layout UI securely
+                document.getElementById('dash-code-display').innerText = foundVoucher.code;
+                document.getElementById('dash-speed').innerText = foundVoucher.speedTier;
+                
+                renderView('view-dashboard');
+
+            } catch (err) {
+                alert("Portal Configuration Error: " + err.message);
+                renderView('view-entry');
+            }
+        }
+
+        document.getElementById('voucher-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') streamLiveVerification();
+        });
+
+        function backToEntryView() { 
+            document.getElementById('voucher-input').value = ''; 
+            renderView('view-entry'); 
+        }
+    </script>
+</body>
+</html>
