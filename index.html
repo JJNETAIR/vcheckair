@@ -41,21 +41,10 @@
 
         <div id="view-dashboard" class="w-full bg-white/70 border border-white/60 backdrop-blur-xl rounded-3xl p-8 shadow-glass space-y-6 hidden transform translate-y-4 opacity-0 transition-all duration-300">
             <div class="flex flex-col items-center text-center space-y-2">
-                <div id="status-icon-active" class="hidden w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-500">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="w-6 h-6">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                    </svg>
-                </div>
-                <div id="status-icon-expired" class="hidden w-12 h-12 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-500">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="w-6 h-6">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </div>
-                
-                <h2 id="dash-status-title" class="text-xl font-semibold tracking-tight">Voucher Status</h2>
+                <div class="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-500 text-xl font-bold">✓</div>
+                <h2 class="text-xl font-semibold tracking-tight">Voucher Active</h2>
                 <p id="dash-code-display" class="text-xs font-mono bg-gray-100 text-gray-600 px-3 py-1 rounded-full uppercase tracking-wider">CODE</p>
             </div>
-
             <div class="bg-white/50 border border-gray-100 rounded-2xl overflow-hidden divide-y divide-gray-100 shadow-inner">
                 <div class="flex justify-between items-center px-5 py-4">
                     <span class="text-sm font-medium text-[#86868B]">Time Remaining</span>
@@ -67,7 +56,7 @@
                 </div>
                 <div class="flex justify-between items-center px-5 py-4">
                     <span class="text-sm font-medium text-[#86868B]">Speed Tier</span>
-                    <span id="dash-speed" class="text-sm font-medium px-3 py-1 rounded-md uppercase">--</span>
+                    <span id="dash-speed" class="text-sm font-medium bg-blue-50 text-blue-600 px-3 py-1 rounded-md">--</span>
                 </div>
             </div>
             <button onclick="backToEntryView()" class="w-full py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-2xl">Check Another Voucher</button>
@@ -82,8 +71,9 @@
     <footer class="w-full py-6 text-center text-[11px] text-[#86868B]">&copy; 2026 Apple Air. All rights reserved.</footer>
 
     <script>
-        // MATCHED DIRECTLY TO YOUR SHEET ID
-        const SPREADSHEET_ID = "1F8TUOpX7gV6rN1n8OQx-uA5p-W9lBnd4S2R3z4_7Bxo"; 
+        // PASTE YOUR KEYS HERE ACCURATELY
+        const BIN_ID = "YOUR_JSONBIN_BIN_ID_HERE"; 
+        const MASTER_KEY = "YOUR_JSONBIN_MASTER_KEY_HERE"; 
 
         function renderView(viewId) {
             ['view-entry', 'view-dashboard', 'view-loading'].forEach(v => {
@@ -95,18 +85,6 @@
             });
         }
 
-        function parseSheetDateString(str) {
-            if (!str) return null;
-            const parts = str.split('/');
-            if (parts.length === 3) {
-                const day = parseInt(parts[0], 10);
-                const month = parseInt(parts[1], 10) - 1; 
-                const year = parseInt(parts[2], 10);
-                return new Date(year, month, day);
-            }
-            return new Date(str);
-        }
-
         async function streamLiveVerification() {
             const userInput = document.getElementById('voucher-input').value.trim().toLowerCase();
             if (!userInput) return alert('Please enter a voucher code.');
@@ -114,44 +92,59 @@
             renderView('view-loading');
 
             try {
-                // UNIVERSAL PROXY ENDPOINT: Reads public text data securely without needing general access token keys
-                const csvEndpoint = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&id=${SPREADSHEET_ID}&gid=0&cache_bypass=${Date.now()}`;
+                // 1. Fetch spreadsheet URL string from cloud storage
+                const cloudResponse = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    headers: { "X-Master-Key": MASTER_KEY }
+                });
+                const cloudData = await cloudResponse.json();
+                const activeUrl = cloudData.record.url;
 
-                const response = await fetch(csvEndpoint);
+                if (!activeUrl) throw new Error("Cloud sync record is empty. Go to admin panel and save link.");
+
+                const match = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+                if (!match) throw new Error("The saved link inside JSONBin does not match a clean Google Spreadsheet ID layout.");
                 
-                if (!response.ok) {
-                    throw new Error("Google blocked the access pipeline. Let's process fallback rules.");
-                }
+                const spreadsheetId = match[1];
+                const csvEndpoint = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=0&cache_bypass=${Date.now()}`;
 
+                // 2. Fetch direct spreadsheet content strings
+                const response = await fetch(csvEndpoint);
                 const csvText = await response.text();
-
-                if (!csvText || csvText.trim().startsWith('<!DOCTYPE html>') || csvText.includes('google.com/signout')) {
-                    throw new Error("Private Layout Warning. Open your Google Sheet, click the blue Share button, and set General Access to 'Anyone with the link'!");
+                
+                // If Google sends back HTML login text instead of plain CSV text data rows
+                if (csvText.trim().startsWith('<!DOCTYPE html>') || csvText.includes('google.com/signout')) {
+                    throw new Error("Google is blocking access. Please open your spreadsheet and go to File -> Share -> Publish to Web -> Choose CSV.");
                 }
 
                 const rows = csvText.split(/\r?\n/);
+                if (rows.length < 2 || !rows[0].trim()) throw new Error("The active spreadsheet matching this cloud URL appears empty.");
+
                 let delimiter = rows[0].includes(';') ? ';' : ',';
                 const headers = rows[0].split(delimiter).map(h => h.replace(/^["']|["']$/g, '').trim().toLowerCase());
                 
                 const codeColumnIndex = headers.indexOf('code');
-                const timeColumnIndex = headers.indexOf('timeremaining');
-                const speedColumnIndex = headers.indexOf('speedtier');
-
-                if (codeColumnIndex === -1 || timeColumnIndex === -1) {
-                    throw new Error("Column structural header read mismatch.");
+                if (codeColumnIndex === -1) {
+                    throw new Error("Could not find a header named exactly 'code' in Row 1 of your sheet.");
                 }
 
                 let foundVoucher = null;
 
                 for (let i = 1; i < rows.length; i++) {
                     if (!rows[i].trim()) continue;
+                    
                     const columns = rows[i].split(delimiter).map(c => c.replace(/^["']|["']$/g, '').trim());
                     
                     if (columns[codeColumnIndex] && columns[codeColumnIndex].toLowerCase() === userInput) {
+                        const record = {};
+                        headers.forEach((h, idx) => {
+                            record[h] = columns[idx] || '';
+                        });
+
                         foundVoucher = {
                             code: columns[codeColumnIndex].toUpperCase(),
-                            expiryDate: columns[timeColumnIndex] || '',
-                            speedTier: columns[speedColumnIndex] || 'HIGH'
+                            timeRemaining: record['timeremaining'] || 'Active',
+                            dataAllowance: record['dataallowance'] || 'Unlimited',
+                            speedTier: record['speedtier'] || 'High Speed Profile'
                         };
                         break;
                     }
@@ -163,64 +156,18 @@
                     return;
                 }
 
-                const today = new Date();
-                today.setHours(0,0,0,0);
-                
-                const expiry = parseSheetDateString(foundVoucher.expiryDate);
-                if (expiry) expiry.setHours(0,0,0,0);
-
-                const activeIcon = document.getElementById('status-icon-active');
-                const expiredIcon = document.getElementById('status-icon-expired');
-                const titleText = document.getElementById('dash-status-title');
-                const speedBadge = document.getElementById('dash-speed');
-
-                activeIcon.classList.add('hidden');
-                expiredIcon.classList.add('hidden');
-                speedBadge.className = "text-sm font-medium px-3 py-1 rounded-md uppercase";
-
-                if (expiry && expiry.getTime() >= today.getTime()) {
-                    const timeDiff = expiry.getTime() - today.getTime();
-                    const daysRemaining = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
-
-                    activeIcon.classList.remove('hidden');
-                    titleText.innerText = "Voucher Active";
-                    titleText.className = "text-xl font-semibold tracking-tight text-emerald-600";
-                    
-                    document.getElementById('dash-data').innerText = "unlimited";
-                    document.getElementById('dash-data').className = "text-base font-semibold text-gray-900 lowercase";
-                    
-                    document.getElementById('dash-time').innerText = foundVoucher.expiryDate;
-                    document.getElementById('dash-time').className = "text-base font-semibold text-gray-900";
-                    
-                    speedBadge.classList.add('bg-blue-50', 'text-blue-600');
-                } else {
-                    expiredIcon.classList.remove('hidden');
-                    titleText.innerText = "Voucher Expired";
-                    titleText.className = "text-xl font-semibold tracking-tight text-rose-600";
-                    
-                    document.getElementById('dash-data').innerText = "Inactive";
-                    document.getElementById('dash-data').className = "text-base font-semibold text-rose-600";
-
-                    document.getElementById('dash-time').innerText = foundVoucher.expiryDate || 'Expired';
-                    document.getElementById('dash-time').className = "text-base font-semibold text-rose-600";
-                    
-                    speedBadge.classList.add('bg-gray-100', 'text-gray-400');
-                }
-
                 document.getElementById('dash-code-display').innerText = foundVoucher.code;
+                document.getElementById('dash-time').innerText = foundVoucher.timeRemaining;
+                document.getElementById('dash-data').innerText = foundVoucher.dataAllowance;
                 document.getElementById('dash-speed').innerText = foundVoucher.speedTier;
                 
                 renderView('view-dashboard');
 
             } catch (err) {
-                alert("Notice: " + err.message);
+                alert("Portal Configuration Error: " + err.message);
                 renderView('view-entry');
             }
         }
-
-        document.getElementById('voucher-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') streamLiveVerification();
-        });
 
         function backToEntryView() { 
             document.getElementById('voucher-input').value = ''; 
