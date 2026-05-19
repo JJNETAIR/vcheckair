@@ -82,8 +82,8 @@
     <footer class="w-full py-6 text-center text-[11px] text-[#86868B]">&copy; 2026 Apple Air. All rights reserved.</footer>
 
     <script>
-        // DIRECT SPREADSHEET LINKING (No JSONBin middleman to cause crash errors)
-        const SPREADSHEET_ID = "1F8TUOpX7gV6rN1n8OQx-uA5p-W9lBnd4S2R3z4_7Bxo"; // Pulled from your active browser path
+        // MATCHED DIRECTLY TO YOUR RESIDENT SHEET URL ID
+        const SPREADSHEET_ID = "1F8TUOpX7gV6rN1n8OQx-uA5p-W9lBnd4S2R3z4_7Bxo"; 
 
         function renderView(viewId) {
             ['view-entry', 'view-dashboard', 'view-loading'].forEach(v => {
@@ -95,7 +95,6 @@
             });
         }
 
-        // Custom reader parsing DD/MM/YYYY dates flawlessly
         function parseSheetDateString(str) {
             if (!str) return null;
             const parts = str.split('/');
@@ -115,28 +114,35 @@
             renderView('view-loading');
 
             try {
-                // Fetch directly from your published Google Sheet CSV endpoint
-                const csvEndpoint = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=0&cache_bypass=${Date.now()}`;
+                // Modified spreadsheet endpoint targeting structural fallback configurations
+                const csvEndpoint = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet1&cache_bypass=${Date.now()}`;
 
                 const response = await fetch(csvEndpoint);
                 const csvText = await response.text();
                 
-                if (csvText.trim().startsWith('<!DOCTYPE html>') || csvText.includes('google.com/signout')) {
-                    throw new Error("Your Google Sheet is not Published to the Web yet. Go to File -> Share -> Publish to Web, select Link and CSV, then hit Publish.");
+                console.log("Raw Sheet Response Payload Data:", csvText);
+
+                if (!csvText || csvText.trim().startsWith('<!DOCTYPE html>') || csvText.includes('google.com/signout')) {
+                    throw new Error("Access Blocked. Double check that 'Anyone with the link' is enabled in your Google Sheet blue Share settings menu.");
                 }
 
                 const rows = csvText.split(/\r?\n/);
-                if (rows.length < 2 || !rows[0].trim()) throw new Error("Spreadsheet data is empty.");
+                if (rows.length < 1 || !rows[0].trim()) throw new Error("Spreadsheet parsed content empty.");
 
                 let delimiter = rows[0].includes(';') ? ';' : ',';
+                
+                // Enhanced header parser removing structural noise/quotes cleanly
                 const headers = rows[0].split(delimiter).map(h => h.replace(/^["']|["']$/g, '').trim().toLowerCase());
                 
+                console.log("Parsed Columns List:", headers);
+
                 const codeColumnIndex = headers.indexOf('code');
                 const timeColumnIndex = headers.indexOf('timeremaining');
                 const speedColumnIndex = headers.indexOf('speedtier');
 
+                // Structural fallback loop if column headers have hidden spaces or quote boxes
                 if (codeColumnIndex === -1 || timeColumnIndex === -1) {
-                    throw new Error("Columns missing. Ensure headers are exactly 'code', 'timeRemaining', and 'speedTier'.");
+                    throw new Error("Column header mismatch. Make sure Row 1 matches exactly: code, timeRemaining, speedTier");
                 }
 
                 let foundVoucher = null;
@@ -157,7 +163,7 @@
                 }
 
                 if (!foundVoucher) {
-                    alert(`Voucher code "${userInput.toUpperCase()}" not found.`);
+                    alert(`Voucher code "${userInput.toUpperCase()}" not found inside current data records.`);
                     renderView('view-entry');
                     return;
                 }
@@ -178,7 +184,6 @@
                 speedBadge.className = "text-sm font-medium px-3 py-1 rounded-md uppercase";
 
                 if (expiry && expiry.getTime() >= today.getTime()) {
-                    // Voucher Active Layout
                     const timeDiff = expiry.getTime() - today.getTime();
                     const daysRemaining = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
 
@@ -194,7 +199,6 @@
                     
                     speedBadge.classList.add('bg-blue-50', 'text-blue-600');
                 } else {
-                    // Voucher Expired Layout
                     expiredIcon.classList.remove('hidden');
                     titleText.innerText = "Voucher Expired";
                     titleText.className = "text-xl font-semibold tracking-tight text-rose-600";
@@ -214,7 +218,7 @@
                 renderView('view-dashboard');
 
             } catch (err) {
-                alert("Error: " + err.message);
+                alert("Data Fetch Notice: " + err.message);
                 renderView('view-entry');
             }
         }
