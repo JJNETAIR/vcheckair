@@ -41,22 +41,25 @@
 
         <div id="view-dashboard" class="w-full bg-white/70 border border-white/60 backdrop-blur-xl rounded-3xl p-8 shadow-glass space-y-6 hidden transform translate-y-4 opacity-0 transition-all duration-300">
             <div class="flex flex-col items-center text-center space-y-2">
-                <div class="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-500 text-xl font-bold">✓</div>
-                <h2 class="text-xl font-semibold tracking-tight">Voucher Active</h2>
+                <div id="status-icon-active" class="hidden w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-500 text-xl font-bold">✓</div>
+                <div id="status-icon-expired" class="hidden w-12 h-12 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-500 text-xl font-bold">✕</div>
+                
+                <h2 id="dash-status-title" class="text-xl font-semibold tracking-tight">Voucher Status</h2>
                 <p id="dash-code-display" class="text-xs font-mono bg-gray-100 text-gray-600 px-3 py-1 rounded-full uppercase tracking-wider">CODE</p>
             </div>
+
             <div class="bg-white/50 border border-gray-100 rounded-2xl overflow-hidden divide-y divide-gray-100 shadow-inner">
                 <div class="flex justify-between items-center px-5 py-4">
-                    <span class="text-sm font-medium text-[#86868B]">Expiry / Validity</span>
+                    <span class="text-sm font-medium text-[#86868B]">Time Remaining</span>
                     <span id="dash-time" class="text-base font-semibold">--</span>
                 </div>
                 <div class="flex justify-between items-center px-5 py-4">
                     <span class="text-sm font-medium text-[#86868B]">Data Allowance</span>
-                    <span id="dash-data" class="text-base font-semibold text-emerald-600">Unlimited Data</span>
+                    <span id="dash-data" class="text-base font-semibold">Unlimited Data</span>
                 </div>
                 <div class="flex justify-between items-center px-5 py-4">
                     <span class="text-sm font-medium text-[#86868B]">Speed Tier</span>
-                    <span id="dash-speed" class="text-sm font-medium bg-blue-50 text-blue-600 px-3 py-1 rounded-md">--</span>
+                    <span id="dash-speed" class="text-sm font-medium px-3 py-1 rounded-md">--</span>
                 </div>
             </div>
             <button onclick="backToEntryView()" class="w-full py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-2xl">Check Another Voucher</button>
@@ -71,7 +74,6 @@
     <footer class="w-full py-6 text-center text-[11px] text-[#86868B]">&copy; 2026 Apple Air. All rights reserved.</footer>
 
     <script>
-        // Connected directly to your cloud bin credentials
         const BIN_ID = "6a0cacb36877513b279bbe63"; 
         const MASTER_KEY = "$2a$10$LS7aJr2QiV2RpptiyeBA9umWLUV9NV8nYaEVHT91YLShcgX1xNPbC"; 
 
@@ -85,6 +87,19 @@
             });
         }
 
+        // Helper to cleanly parse DD/MM/YYYY text values from Google Sheets
+        function parseSheetDateString(str) {
+            if (!str) return null;
+            const parts = str.split('/');
+            if (parts.length === 3) {
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10) - 1; 
+                const year = parseInt(parts[2], 10);
+                return new Date(year, month, day);
+            }
+            return new Date(str);
+        }
+
         async function streamLiveVerification() {
             const userInput = document.getElementById('voucher-input').value.trim().toLowerCase();
             if (!userInput) return alert('Please enter a voucher code.');
@@ -92,30 +107,24 @@
             renderView('view-loading');
 
             try {
-                // 1. Fetch spreadsheet configuration path
+                // 1. Fetch current spreadsheet endpoint tracking configuration link
                 const cloudResponse = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
                     headers: { "X-Master-Key": MASTER_KEY }
                 });
                 const cloudData = await cloudResponse.json();
                 const activeUrl = cloudData.record.url;
 
-                if (!activeUrl) throw new Error("Cloud sync record is empty.");
+                if (!activeUrl) throw new Error("Cloud sync destination empty.");
 
                 const match = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-                if (!match) throw new Error("Invalid Google Spreadsheet URL structure.");
+                if (!match) throw new Error("Invalid spreadsheet link signature.");
                 
                 const spreadsheetId = match[1];
                 const csvEndpoint = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=0&cache_bypass=${Date.now()}`;
 
-                // 2. Fetch data strings from sheet grid
+                // 2. Fetch dataset arrays from sheet structure
                 const response = await fetch(csvEndpoint);
                 const csvText = await response.text();
-                
-                if (csvText.trim().startsWith('<!DOCTYPE html>') || csvText.includes('google.com/signout')) {
-                    alert("Data Fetch Notice: Access Blocked. Double check that 'Anyone with the link' is enabled in your Google Sheet blue Share settings menu.");
-                    renderView('view-entry');
-                    return;
-                }
 
                 const rows = csvText.split(/\r?\n/);
                 let delimiter = rows[0].includes(';') ? ';' : ',';
@@ -126,7 +135,7 @@
                 const speedColumnIndex = headers.indexOf('speedtier');
 
                 if (codeColumnIndex === -1) {
-                    alert("Could not find a header named exactly 'code' in Row 1 of your sheet.");
+                    alert("Collect new voucher before expiration ⚠️");
                     renderView('view-entry');
                     return;
                 }
@@ -135,34 +144,100 @@
 
                 for (let i = 1; i < rows.length; i++) {
                     if (!rows[i].trim()) continue;
-                    
                     const columns = rows[i].split(delimiter).map(c => c.replace(/^["']|["']$/g, '').trim());
                     
                     if (columns[codeColumnIndex] && columns[codeColumnIndex].toLowerCase() === userInput) {
                         foundVoucher = {
                             code: columns[codeColumnIndex].toUpperCase(),
-                            timeRemaining: columns[timeColumnIndex] || 'Active',
+                            expiryText: columns[timeColumnIndex] || '',
                             speedTier: columns[speedColumnIndex] || 'High Profile'
                         };
                         break;
                     }
                 }
 
-                // YOUR CUSTOM POPUP TRIGGER:
+                // FLASH MESSAGE FOR INVALID CODES
                 if (!foundVoucher) {
-                    alert("It’s not valid or Expired ⚠️");
+                    alert("Collect new voucher before expiration ⚠️");
                     renderView('view-entry');
                     return;
                 }
 
-                document.getElementById('dash-code-display').innerText = foundVoucher.code;
-                document.getElementById('dash-time').innerText = foundVoucher.timeRemaining;
-                document.getElementById('dash-speed').innerText = foundVoucher.speedTier;
+                // Calculate date delta metrics automatically
+                const today = new Date();
+                today.setHours(0,0,0,0);
                 
-                renderView('view-dashboard');
+                const expiryDate = parseSheetDateString(foundVoucher.expiryText);
+                let daysRemainingText = foundVoucher.expiryText; 
+                let isExpired = false;
+
+                if (expiryDate && !isNaN(expiryDate.getTime())) {
+                    expiryDate.setHours(0,0,0,0);
+                    const timeDiff = expiryDate.getTime() - today.getTime();
+                    const diffInDays = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+
+                    if (diffInDays > 1) {
+                        daysRemainingText = `${diffInDays} Days Remaining`;
+                    } else if (diffInDays === 1) {
+                        daysRemainingText = `1 Day Remaining`;
+                    } else if (diffInDays === 0) {
+                        daysRemainingText = `Expires Today`;
+                    } else {
+                        isExpired = true;
+                        daysRemainingText = `Expired (${foundVoucher.expiryText})`;
+                    }
+                }
+
+                const activeIcon = document.getElementById('status-icon-active');
+                const expiredIcon = document.getElementById('status-icon-expired');
+                const titleText = document.getElementById('dash-status-title');
+                const speedBadge = document.getElementById('dash-speed');
+                const dataText = document.getElementById('dash-data');
+                const timeText = document.getElementById('dash-time');
+
+                activeIcon.classList.add('hidden');
+                expiredIcon.classList.add('hidden');
+
+                if (!isExpired) {
+                    // DISPLAY INTERACTIVE ACTIVE STATE (Green Theme)
+                    activeIcon.classList.remove('hidden');
+                    titleText.innerText = "Voucher Active";
+                    titleText.className = "text-xl font-semibold tracking-tight text-emerald-600";
+                    
+                    dataText.innerText = "Unlimited Data";
+                    dataText.className = "text-base font-semibold text-gray-900";
+                    
+                    timeText.innerText = daysRemainingText;
+                    timeText.className = "text-base font-semibold text-emerald-600";
+                    
+                    speedBadge.innerText = foundVoucher.speedTier;
+                    speedBadge.className = "text-sm font-medium bg-blue-50 text-blue-600 px-3 py-1 rounded-md uppercase";
+                    
+                    document.getElementById('dash-code-display').innerText = foundVoucher.code;
+                    renderView('view-dashboard');
+                } else {
+                    // FLASH MESSAGE AND FORCE RED INACTIVE STATE IF EXPIRED
+                    alert("Collect new voucher before expiration ⚠️");
+                    
+                    expiredIcon.classList.remove('hidden');
+                    titleText.innerText = "Voucher Inactive";
+                    titleText.className = "text-xl font-semibold tracking-tight text-rose-600";
+                    
+                    dataText.innerText = "Inactive";
+                    dataText.className = "text-base font-semibold text-rose-600";
+
+                    timeText.innerText = daysRemainingText;
+                    timeText.className = "text-base font-semibold text-rose-600";
+                    
+                    speedBadge.innerText = foundVoucher.speedTier;
+                    speedBadge.className = "text-sm font-medium bg-gray-100 text-gray-400 px-3 py-1 rounded-md uppercase";
+                    
+                    document.getElementById('dash-code-display').innerText = foundVoucher.code;
+                    renderView('view-dashboard');
+                }
 
             } catch (err) {
-                alert("It’s not valid or Expired ⚠️");
+                alert("Collect new voucher before expiration ⚠️");
                 renderView('view-entry');
             }
         }
