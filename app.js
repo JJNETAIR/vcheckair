@@ -12,7 +12,6 @@ function renderView(viewId) {
     });
 }
 
-// 🛠️ Advanced CSV Parser: Splits cells cleanly without merging them
 function parseCSVLine(text, delimiter) {
     let columns = [];
     let insideQuotes = false;
@@ -33,7 +32,6 @@ function parseCSVLine(text, delimiter) {
     return columns.map(col => col.replace(/^["']|["']$/g, '').trim());
 }
 
-// Helper to calculate days remaining from data strings safely
 function parseSheetDateString(str) {
     if (!str) return null;
     let sanitized = str.replace(/[\r\n]+/g, ' ').trim();
@@ -99,28 +97,24 @@ async function streamLiveVerification() {
         const cloudData = await cloudResponse.json();
         const activeUrl = cloudData.record.url;
 
-        if (!activeUrl) throw new Error("Cloud URL mapping targets are blank.");
+        if (!activeUrl) throw new Error("JSONBin mapping target empty.");
 
         const match = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-        if (!match) throw new Error("Google spreadsheet link structure mismatch.");
+        if (!match) throw new Error("Google Spreadsheet key missing.");
         
         const spreadsheetId = match[1];
         const csvEndpoint = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&cache_bypass=${Date.now()}`;
 
         const response = await fetch(csvEndpoint);
-        if (!response.ok) throw new Error(`Google connection failed: ${response.status}`);
+        if (!response.ok) throw new Error(`Google error: ${response.status}`);
         
         const csvText = await response.text();
         const rows = csvText.split(/\r?\n/);
-        if (rows.length < 2) throw new Error("Spreadsheet contains no row entries.");
+        if (rows.length < 2) throw new Error("Sheet is empty.");
 
         let delimiter = rows[0].includes(';') ? ';' : ',';
 
-        // 🎯 POSITION CORRECTION LOCKS:
-        // Column A = 0 (Voucher)
-        // Column B = 1 (Start Time)
-        // Column C = 2 (Duration)
-        // Column D = 3 (Expiration Time)
+        // Direct Index Locks (A=0, B=1, C=2, D=3)
         let codeIdx = 0;
         let startTimeIdx = 1;
         let durationIdx = 2;
@@ -152,19 +146,16 @@ async function streamLiveVerification() {
         const gridContainer = document.getElementById('festa-data-container');
         gridContainer.innerHTML = ''; 
 
-        // Extract cell data elements safely from their physical columns
         let voucherCodeDisplay = (matchedRowFields[codeIdx] || userInput).toUpperCase();
         let startTimeVal = matchedRowFields[startTimeIdx] || 'Not Activated Yet';
         let durationVal = matchedRowFields[durationIdx] || '--';
         let expirationVal = matchedRowFields[expirationIdx] || 'No Limit';
 
-        // Strip hidden trailing spaces or syntax breaks cleanly
         voucherCodeDisplay = voucherCodeDisplay.replace(/[\r\n]+/g, ' ').trim();
         startTimeVal = startTimeVal.replace(/[\r\n]+/g, ' ').trim();
         durationVal = durationVal.replace(/[\r\n]+/g, ' ').trim();
         expirationVal = expirationVal.replace(/[\r\n]+/g, ' ').trim();
 
-        // Check active expiration state
         let isExpired = false;
         let validityBadgeText = expirationVal;
         
@@ -181,7 +172,7 @@ async function streamLiveVerification() {
             }
         }
 
-        // 🍎 SEPARATED ROW INJECTIONS (Completely breaks Column B and D apart)
+        // Inject fields dynamically into the newly updated HTML grid layout!
         gridContainer.innerHTML += createDisplayRow("Voucher Code", voucherCodeDisplay, false);
         gridContainer.innerHTML += createDisplayRow("Start Time", startTimeVal, false);
         gridContainer.innerHTML += createDisplayRow("Plan Duration", durationVal, false);
