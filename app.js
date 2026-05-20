@@ -26,7 +26,7 @@ function parseCSVLine(text, delimiter) {
             currentColumn = '';
         } else {
             currentColumn += char;
-          }
+        }
     }
     columns.push(currentColumn.trim());
     return columns.map(col => col.replace(/^["']|["']$/g, '').trim());
@@ -97,10 +97,10 @@ async function streamLiveVerification() {
         const cloudData = await cloudResponse.json();
         const activeUrl = cloudData.record.url;
 
-        if (!activeUrl) throw new Error("Cloud mapping parameters verified empty.");
+        if (!activeUrl) throw new Error("Cloud dataset targets unconfigured.");
 
         const match = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-        if (!match) throw new Error("Google source URL pattern error.");
+        if (!match) throw new Error("Google source layout key mismatch.");
         
         const spreadsheetId = match[1];
         const csvEndpoint = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&cache_bypass=${Date.now()}`;
@@ -110,11 +110,11 @@ async function streamLiveVerification() {
         
         const csvText = await response.text();
         const rows = csvText.split(/\r?\n/);
-        if (rows.length < 2) throw new Error("Target matrix database empty.");
+        if (rows.length < 2) throw new Error("Data storage target empty.");
 
         let delimiter = rows[0].includes(';') ? ';' : ',';
 
-        // 🎯 DIRECT LOCKED EXTRACTION BY FIELD POSITIONS
+        // 🎯 EXACT PHYSICAL EXTRACTION INDEXES
         let codeIdx = 0;         // Column A
         let startTimeIdx = 1;    // Column B
         let durationIdx = 2;     // Column C
@@ -172,7 +172,7 @@ async function streamLiveVerification() {
             }
         }
 
-        // 🍎 Build separated elegant data list rows
+        // Outputting clean, individual rows to separate Column B and Column D beautifully
         gridContainer.innerHTML += createDisplayRow("Voucher Code", voucherCodeDisplay, false);
         gridContainer.innerHTML += createDisplayRow("Start Time", startTimeVal, false);
         gridContainer.innerHTML += createDisplayRow("Plan Duration", durationVal, false);
@@ -219,12 +219,5 @@ document.addEventListener('DOMContentLoaded', () => {
         inputEl.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') streamLiveVerification();
         });
-    }
-
-    // ⚡ Automatic cleanup for service worker registration overrides
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js').then(reg => {
-            reg.update(); // Force look for V2 cache changes immediately
-        }).catch(err => console.log("SW Registration failure:", err));
     }
 });
