@@ -110,19 +110,20 @@
             });
         }
 
-        // Flexible date parser configured to read text date values cleanly
+        // 📅 ROBUST DASHBOARD STRING PARSER
+        // Decodes omada-style export timestamps directly (e.g., "May 20, 2026 09:00:51 am")
         function parseSheetDateString(str) {
             if (!str) return null;
             
-            // Format fallback wrapper for standard text: "May 20, 2026 09:00:51 am"
-            const cleanedStr = str.replace(/(am|pm)/i, '').trim();
+            // Format fallback: Standard text date parsing strings
+            let cleanedStr = str.replace(/am/i, ' AM').replace(/pm/i, ' PM').trim();
             const parsedTimestamp = Date.parse(cleanedStr);
             
             if (!isNaN(parsedTimestamp)) {
                 return new Date(parsedTimestamp);
             }
 
-            // Fallback for fallback slashes DD/MM/YYYY
+            // Fallback for raw slash boundaries (DD/MM/YYYY)
             const parts = str.split('/');
             if (parts.length === 3) {
                 const day = parseInt(parts[0], 10);
@@ -133,7 +134,7 @@
             return null;
         }
 
-        // 🔔 PERSISTENT DEVICE NOTIFICATION CONTROLLER (SCOPED VIA ASYNC INDEXEDDB)
+        // 🔔 PERSISTENT LOCAL ENVIRONMENT DB SYNC
         function setupNotification(expiryDateString, voucherCode) {
             const notifySection = document.getElementById('notification-section');
             const notifyBtn = document.getElementById('notify-me-btn');
@@ -146,7 +147,6 @@
 
             notifySection.classList.remove('hidden');
 
-            // Initialize/Open IndexedDB Connection
             const dbRequest = indexedDB.open('AppleAirDB', 1);
             dbRequest.onupgradeneeded = (e) => {
                 const db = e.target.result;
@@ -161,13 +161,11 @@
 
                 getReq.onsuccess = () => {
                     if (getReq.result) {
-                        // Lock button state if already scheduled
                         notifyBtn.innerHTML = '<span>Reminder Scheduled!</span> <span>✅</span>';
                         notifyBtn.className = "w-full py-3 px-4 rounded-xl bg-green-50/80 border border-green-200 text-green-600 font-medium flex items-center justify-center space-x-2 pointer-events-none";
                         notifyStatus.innerText = `We will alert you on ${getReq.result}`;
                         notifyStatus.classList.remove('hidden');
                     } else {
-                        // Reset defaults for clean vouchers
                         notifyBtn.innerHTML = '<span>Notify Me 1 Day Before Expiry</span> <span>🔔</span>';
                         notifyBtn.className = "w-full py-3 px-4 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-600 font-medium flex items-center justify-center space-x-2 active:scale-95 transition-transform";
                         notifyStatus.classList.add('hidden');
@@ -177,7 +175,7 @@
 
             notifyBtn.onclick = async () => {
                 if (!('Notification' in window)) {
-                    alert('This device does not support native notifications.');
+                    alert('This browser doesn\'t offer native background push flags.');
                     return;
                 }
 
@@ -185,16 +183,14 @@
                 if (permission === 'granted') {
                     const expiryDate = parseSheetDateString(expiryDateString);
                     if (!expiryDate) {
-                        alert('Could not map date structure requirements.');
+                        alert('Could not cleanly map timestamp variables.');
                         return;
                     }
 
-                    // Subtract exactly 1 day for alert scheduling
                     const alertDate = new Date(expiryDate);
                     alertDate.setDate(alertDate.getDate() - 1);
-                    const alertString = alertDate.toLocaleDateString('en-GB'); // DD/MM/YYYY
+                    const alertString = alertDate.toLocaleDateString('en-GB'); 
 
-                    // Write to IndexedDB
                     const dbReq = indexedDB.open('AppleAirDB', 1);
                     dbReq.onsuccess = (event) => {
                         const db = event.target.result;
@@ -211,11 +207,12 @@
                         };
                     };
                 } else {
-                    alert("Please change permissions inside browser setup layouts.");
+                    alert("Please adjust permission exceptions inside your hardware browser panel.");
                 }
             };
         }
 
+        // ⚡ STREAM VALIDATION STREAM ENGINE
         async function streamLiveVerification() {
             const userInput = document.getElementById('voucher-input').value.trim().toLowerCase();
             if (!userInput) return alert('Please enter a voucher code.');
@@ -229,10 +226,10 @@
                 const cloudData = await cloudResponse.json();
                 const activeUrl = cloudData.record.url;
 
-                if (!activeUrl) throw new Error("Missing cloud database link.");
+                if (!activeUrl) throw new Error("Missing tracking redirection parameter.");
 
                 const match = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-                if (!match) throw new Error("Invalid spreadsheet mapping format.");
+                if (!match) throw new Error("Malformed spreadsheet address key mappings.");
                 
                 const spreadsheetId = match[1];
                 const csvEndpoint = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=0&cache_bypass=${Date.now()}`;
@@ -242,12 +239,21 @@
 
                 const rows = csvText.split(/\r?\n/);
                 let delimiter = rows[0].includes(';') ? ';' : ',';
+                
+                // Decode headers to clean lowercase fields
                 const headers = rows[0].split(delimiter).map(h => h.replace(/^["']|["']$/g, '').trim().toLowerCase());
                 
-                // Track columns mapped smoothly to your new dashboard layout configuration
-                const codeColumnIndex = headers.indexOf('code'); // AUTHORIZED BY column
-                const timeColumnIndex = headers.indexOf('timeremaining'); // EXPIRATION TIME column
-                const speedColumnIndex = headers.indexOf('speedtier'); // Optional profile column
+                // 🔍 SMART REARRANGE LOCATOR MATCH SYSTEM
+                // Searches for either your code words ('code', 'voucher') OR the raw Festa headers ('authorized', 'expiration')
+                const codeColumnIndex = headers.findIndex(h => h.includes('code') || h.includes('authorize') || h.includes('voucher'));
+                const timeColumnIndex = headers.findIndex(h => h.includes('time') || h.includes('expiration') || h.includes('expiry') || h.includes('remaining'));
+                const speedColumnIndex = headers.findIndex(h => h.includes('speed') || h.includes('tier') || h.includes('profile'));
+
+                if (codeColumnIndex === -1 || timeColumnIndex === -1) {
+                    alert("Header Mismatch: Make sure your sheet row has titles like 'AUTHORIZED BY' and 'EXPIRATION TIME'.");
+                    renderView('view-entry');
+                    return;
+                }
 
                 let foundVoucher = null;
 
@@ -256,14 +262,14 @@
                     const columns = rows[i].split(delimiter).map(c => c.replace(/^["']|["']$/g, '').trim());
                     
                     if (columns[codeColumnIndex]) {
-                        // 🔍 REARRANGE ENGINE FIX: Automatically extract trailing token values and remove "Voucher - " if copied wholesale
+                        // Strips "Voucher - " prefix cleanly if present in copied row
                         let cleanedSheetCode = columns[codeColumnIndex].replace(/Voucher\s*-\s*/i, '').trim();
 
                         if (cleanedSheetCode.toLowerCase() === userInput) {
                             foundVoucher = {
                                 code: cleanedSheetCode.toUpperCase(),
                                 expiryText: columns[timeColumnIndex] || '',
-                                speedTier: columns[speedColumnIndex] || 'HIGH'
+                                speedTier: speedColumnIndex !== -1 ? (columns[speedColumnIndex] || 'HIGH') : 'HIGH'
                             };
                             break;
                         }
@@ -277,7 +283,6 @@
                 }
 
                 const today = new Date();
-                
                 const expiryDate = parseSheetDateString(foundVoucher.expiryText);
                 let combinedDisplayString = foundVoucher.expiryText; 
                 let isExpired = false;
@@ -295,15 +300,12 @@
                     } else {
                         isExpired = true;
                     }
-                } else {
-                    // Fallback configuration standard if time string parsing fails
-                    combinedDisplayString = foundVoucher.expiryText;
                 }
 
+                // EXPIRED DATA HANDLER STATE
                 if (isExpired) {
                     alert("Voucher not valid/Expired  ⚠️");
                     document.getElementById('notification-section').classList.add('hidden');
-
                     document.getElementById('status-icon-active').classList.add('hidden');
                     document.getElementById('status-icon-expired').classList.remove('hidden');
                     
@@ -326,7 +328,7 @@
                     return;
                 }
 
-                // Render Active Configurations Screen
+                // SUCCESS CONFIGURATION RENDER STATE
                 document.getElementById('status-icon-expired').classList.add('hidden');
                 document.getElementById('status-icon-active').classList.remove('hidden');
                 
@@ -346,9 +348,7 @@
                 
                 document.getElementById('dash-code-display').innerText = foundVoucher.code;
                 
-                // Initialize notification tracking parameters
                 setupNotification(foundVoucher.expiryText, foundVoucher.code);
-
                 renderView('view-dashboard');
 
             } catch (err) {
