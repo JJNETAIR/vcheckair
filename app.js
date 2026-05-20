@@ -12,6 +12,7 @@ function renderView(viewId) {
     });
 }
 
+// 🛠️ Advanced CSV Parser: Splits cells cleanly without merging them
 function parseCSVLine(text, delimiter) {
     let columns = [];
     let insideQuotes = false;
@@ -32,6 +33,7 @@ function parseCSVLine(text, delimiter) {
     return columns.map(col => col.replace(/^["']|["']$/g, '').trim());
 }
 
+// Helper to calculate days remaining from data strings safely
 function parseSheetDateString(str) {
     if (!str) return null;
     let sanitized = str.replace(/[\r\n]+/g, ' ').trim();
@@ -97,28 +99,32 @@ async function streamLiveVerification() {
         const cloudData = await cloudResponse.json();
         const activeUrl = cloudData.record.url;
 
-        if (!activeUrl) throw new Error("JSONBin mapping target missing.");
+        if (!activeUrl) throw new Error("Cloud URL mapping targets are blank.");
 
         const match = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-        if (!match) throw new Error("Google sheet ID could not be parsed.");
+        if (!match) throw new Error("Google spreadsheet link structure mismatch.");
         
         const spreadsheetId = match[1];
         const csvEndpoint = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&cache_bypass=${Date.now()}`;
 
         const response = await fetch(csvEndpoint);
-        if (!response.ok) throw new Error(`Google rejected: ${response.status}`);
+        if (!response.ok) throw new Error(`Google connection failed: ${response.status}`);
         
         const csvText = await response.text();
         const rows = csvText.split(/\r?\n/);
-        if (rows.length < 2) throw new Error("Database sheet is empty.");
+        if (rows.length < 2) throw new Error("Spreadsheet contains no row entries.");
 
         let delimiter = rows[0].includes(';') ? ';' : ',';
 
-        // 🎯 FORCE POSITIONAL INDEX LOOKUP (No matter what text formatting is used)
-        let codeIdx = 0;         // Column A
-        let startTimeIdx = 1;    // Column B
-        let durationIdx = 2;     // Column C
-        let expirationIdx = 3;   // Column D
+        // 🎯 POSITION CORRECTION LOCKS:
+        // Column A = 0 (Voucher)
+        // Column B = 1 (Start Time)
+        // Column C = 2 (Duration)
+        // Column D = 3 (Expiration Time)
+        let codeIdx = 0;
+        let startTimeIdx = 1;
+        let durationIdx = 2;
+        let expirationIdx = 3;
 
         let matchedRowFields = null;
 
@@ -146,19 +152,19 @@ async function streamLiveVerification() {
         const gridContainer = document.getElementById('festa-data-container');
         gridContainer.innerHTML = ''; 
 
-        // Extract values strictly by row index position
+        // Extract cell data elements safely from their physical columns
         let voucherCodeDisplay = (matchedRowFields[codeIdx] || userInput).toUpperCase();
         let startTimeVal = matchedRowFields[startTimeIdx] || 'Not Activated Yet';
         let durationVal = matchedRowFields[durationIdx] || '--';
         let expirationVal = matchedRowFields[expirationIdx] || 'No Limit';
 
-        // Clean values of hidden double breaks or quotes
+        // Strip hidden trailing spaces or syntax breaks cleanly
         voucherCodeDisplay = voucherCodeDisplay.replace(/[\r\n]+/g, ' ').trim();
         startTimeVal = startTimeVal.replace(/[\r\n]+/g, ' ').trim();
         durationVal = durationVal.replace(/[\r\n]+/g, ' ').trim();
         expirationVal = expirationVal.replace(/[\r\n]+/g, ' ').trim();
 
-        // Check active validation calculations on the raw text data inside column D
+        // Check active expiration state
         let isExpired = false;
         let validityBadgeText = expirationVal;
         
@@ -175,7 +181,7 @@ async function streamLiveVerification() {
             }
         }
 
-        // 🍎 Separate Display Layout Rows Output
+        // 🍎 SEPARATED ROW INJECTIONS (Completely breaks Column B and D apart)
         gridContainer.innerHTML += createDisplayRow("Voucher Code", voucherCodeDisplay, false);
         gridContainer.innerHTML += createDisplayRow("Start Time", startTimeVal, false);
         gridContainer.innerHTML += createDisplayRow("Plan Duration", durationVal, false);
