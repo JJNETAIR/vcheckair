@@ -2,12 +2,9 @@ const BIN_ID = "6a0cacb36877513b279bbe63";
 const MASTER_KEY = "$2a$10$LS7aJr2QiV2RpptiyeBA9umWLUV9NV8nYaEVHT91YLShcgX1xNPbC"; 
 
 function renderView(viewId) {
-    const views = ['view-entry', 'view-dashboard', 'view-loading'];
-    views.forEach(v => {
+    ['view-entry', 'view-dashboard', 'view-loading'].forEach(v => {
         const el = document.getElementById(v);
-        if (el) {
-            v === viewId ? el.classList.remove('hidden') : el.classList.add('hidden');
-        }
+        if (el) v === viewId ? el.classList.remove('hidden') : el.classList.add('hidden');
     });
 }
 
@@ -19,48 +16,43 @@ async function streamLiveVerification() {
     renderView('view-loading');
 
     try {
-        // 1. Get Google Sheet URL from Cloud
-        const cloudResponse = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
-            headers: { "X-Master-Key": MASTER_KEY }
-        });
+        const cloudResponse = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { headers: { "X-Master-Key": MASTER_KEY }});
         const cloudData = await cloudResponse.json();
-        const activeUrl = cloudData.record.url;
-        const spreadsheetId = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)[1];
+        const spreadsheetId = cloudData.record.url.match(/\/d\/([a-zA-Z0-9-_]+)/)[1];
         
-        // 2. Fetch CSV Data
         const response = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&cache_bypass=${Date.now()}`);
         const csvText = await response.text();
-        const rows = csvText.split(/\r?\n/);
+        const rows = csvText.split(/\r?\n/).filter(r => r.trim() !== "");
         
-        // 3. Extract Headers and Find Row
-        const headers = rows[0].split(',').map(h => h.trim());
+        // Split by comma (if your sheet uses semicolons, change the split to ';')
+        const headers = rows[0].split(',').map(h => h.trim().toLowerCase());
         const matchedRow = rows.find(row => row.toLowerCase().includes(userInput));
 
         if (!matchedRow) {
-            alert("Voucher not found!");
+            alert("Voucher not found.");
             renderView('view-entry');
             return;
         }
 
         const values = matchedRow.split(',');
         const container = document.getElementById('festa-data-container');
-        container.innerHTML = ''; // Clear previous
+        container.innerHTML = ''; 
 
-        // 4. Dynamically loop through ALL columns found
+        // Build list dynamically
         headers.forEach((header, index) => {
-            if (values[index]) {
-                container.innerHTML += `
-                    <div class="flex justify-between items-center px-5 py-4">
-                        <span class="text-sm font-medium text-[#86868B]">${header}</span>
-                        <span class="text-base font-semibold text-gray-900">${values[index].trim()}</span>
-                    </div>`;
-            }
+            const val = values[index] ? values[index].trim() : "-";
+            const isExp = header.includes('exp');
+            
+            container.innerHTML += `
+                <div class="flex justify-between items-center px-5 py-4 border-b border-gray-100">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">${header}</span>
+                    <span class="text-base font-bold ${isExp ? 'text-rose-600' : 'text-gray-900'}">${val}</span>
+                </div>`;
         });
 
         renderView('view-dashboard');
-
     } catch (err) {
-        alert("Error connecting to database: " + err.message);
+        alert("Sync error: " + err.message);
         renderView('view-entry');
     }
 }
