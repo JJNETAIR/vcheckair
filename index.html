@@ -17,45 +17,47 @@
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: { sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', 'sans-serif'] },
-                    boxShadow: { 'apple': '0 4px 30px rgba(0, 0, 0, 0.03)', 'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.06)' }
+                    fontFamily: { sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"Helvetica Neue"', 'sans-serif'] },
+                    boxShadow: { 'apple': '0 4px 30px rgba(0, 0, 0, 0.02)', 'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.04)' }
                 }
             }
         }
     </script>
 </head>
-<body class="bg-[#F5F5F7] text-[#1D1D1F] min-h-screen flex flex-col justify-between">
+<body class="bg-[#F5F5F7] text-[#1D1D1F] min-h-screen flex flex-col justify-between selection:bg-blue-500/10">
     
     <header class="w-full py-8 px-6 flex justify-center items-center">
         <div class="flex items-center space-x-3">
-            <div class="w-12 h-12 rounded-2xl bg-white border border-gray-200/80 shadow-apple flex items-center justify-center">
-                <span class="text-2xl font-semibold opacity-80"></span>
+            <div class="w-12 h-12 rounded-2xl bg-white border border-gray-200/60 shadow-apple flex items-center justify-center">
+                <span class="text-2xl font-semibold opacity-85 select-none"></span>
             </div>
             <span class="text-xl font-bold tracking-tight text-[#1D1D1F]">Apple Air</span>
         </div>
     </header>
 
     <main class="w-full max-w-md mx-auto px-5 flex-grow flex flex-col justify-center items-center">
-        <div id="view-entry" class="w-full bg-white rounded-3xl p-6 shadow-apple border border-gray-100 space-y-6">
-            <div class="text-center space-y-1.5">
-                <h1 class="text-2xl font-bold tracking-tight">Voucher Validation</h1>
-                <p class="text-xs text-[#86868B]">Enter your code below to view active network details.</p>
+        
+        <div id="view-entry" class="w-full bg-white rounded-3xl p-6 shadow-apple border border-gray-100/80 space-y-6">
+            <div class="text-center space-y-2">
+                <h1 class="text-2xl font-bold tracking-tight">Voucher Verification</h1>
+                <p class="text-xs text-[#86868B] leading-relaxed max-w-[280px] mx-auto">Enter your credentials below to pull live validation profiles directly from database.</p>
             </div>
             <div class="space-y-4">
-                <input type="text" id="voucher-input" placeholder="Enter Voucher Code" autocomplete="off" class="w-full px-4 py-4 bg-[#F5F5F7] rounded-2xl text-base font-semibold text-center uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-inner tracking-wider">
-                <button id="check-btn" class="w-full py-4 bg-black text-white font-semibold rounded-2xl shadow-sm hover:bg-gray-900 transition-colors">Verify Details</button>
+                <input type="text" id="voucher-input" placeholder="Enter Voucher Code" autocomplete="off" class="w-full px-4 py-4 bg-[#F5F5F7] rounded-2xl text-base font-bold text-center uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-inner tracking-widest placeholder:tracking-normal placeholder:font-normal">
+                <button id="check-btn" class="w-full py-4 bg-[#0071E3] hover:bg-[#0077ED] text-white font-semibold rounded-2xl shadow-sm transition-colors tracking-wide">Check Validity</button>
             </div>
         </div>
 
         <div id="view-dashboard" class="w-full space-y-4 hidden">
-            <div class="bg-white rounded-3xl p-6 shadow-apple border border-gray-100 space-y-6">
+            <div class="bg-white rounded-3xl p-6 shadow-apple border border-gray-100/80 space-y-6">
+                
                 <div class="flex items-center justify-between border-b border-gray-100 pb-4">
                     <div>
-                        <p class="text-[11px] font-bold text-[#86868B] uppercase tracking-widest">Active Session</p>
-                        <h2 id="dash-code-display" class="text-lg font-bold font-mono tracking-wide text-gray-900">CODE</h2>
+                        <p class="text-[10px] font-bold text-[#86868B] uppercase tracking-widest mb-0.5">Active Voucher</p>
+                        <h2 id="dash-code-display" class="text-lg font-bold font-mono tracking-wide text-gray-900">0000000000</h2>
                     </div>
-                    <span id="dash-status-badge" class="text-xs font-bold px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">
-                        ● Live Profile
+                    <span class="text-[11px] font-bold px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/60 flex items-center gap-1.5 select-none animate-pulse">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Live Profile
                     </span>
                 </div>
 
@@ -63,16 +65,18 @@
                     </div>
             </div>
 
-            <button id="back-btn" class="w-full py-4 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-semibold rounded-2xl transition-colors">Check Another Code</button>
+            <button id="back-btn" class="w-full py-4 bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 text-sm font-semibold rounded-2xl transition-colors tracking-wide">Check Another Voucher</button>
         </div>
 
-        <div id="view-loading" class="hidden flex flex-col items-center space-y-3 py-12">
-            <div class="w-7 h-7 border-3 border-gray-200 border-t-black rounded-full animate-spin"></div>
-            <p class="text-xs font-semibold text-[#86868B] tracking-wide">Querying live systems...</p>
+        <div id="view-loading" class="hidden flex flex-col items-center space-y-3 py-14 select-none">
+            <div class="w-8 h-8 border-[3px] border-gray-200 border-t-black rounded-full animate-spin"></div>
+            <p class="text-xs font-semibold text-[#86868B] tracking-wide">Syncing real-time records...</p>
         </div>
     </main>
 
-    <footer class="w-full py-6 text-center text-[10px] font-medium text-[#86868B] tracking-wide">&copy; 2026 Apple Air Infrastructure</footer>
+    <footer class="w-full py-6 text-center text-[10px] font-medium text-[#86868B] tracking-wide select-none">
+        &copy; 2026 Apple Air Infrastructure. All rights reserved.
+    </footer>
 
     <script src="app.js"></script>
 </body>
