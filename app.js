@@ -1,6 +1,6 @@
 /**
- * Apple Air - High Performance Realtime Sync Database Core
- * Structural Matrix Rules: A: code | B: start time | C: status | D: Expirationtime
+ * Apple Air - High-Performance Realtime Sync Database Core
+ * Mapping Layout: A: code | B: start time | C: status | D: Expirationtime
  */
 
 const BIN_ID = "6a0cacb36877513b279bbe63"; 
@@ -13,7 +13,7 @@ function renderView(viewId) {
     });
 }
 
-// Custom split parser handling internal column commas safely
+// Clean text data line format parsing utility
 function parseCSVLine(text, delimiter) {
     if (!text) return [];
     let columns = [];
@@ -35,7 +35,7 @@ function parseCSVLine(text, delimiter) {
     return columns.map(col => col.replace(/^["']|["']$/g, '').trim());
 }
 
-async function streamLiveVerification() {
+window.streamLiveVerification = async function() {
     const inputEl = document.getElementById('voucher-input');
     const userInput = inputEl.value.trim().toLowerCase();
     if (!userInput) return alert('Please enter your voucher code.');
@@ -50,17 +50,17 @@ async function streamLiveVerification() {
         const cloudData = await cloudResponse.json();
         const activeUrl = cloudData.record.url;
         
-        // 2. Strict Core Sheet ID Regex Extractor
+        // 2. Extract Core Sheet ID cleanly using a precise matching template
         const idMatch = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
         if (!idMatch || !idMatch[1]) {
             throw new Error("Stored URL is missing a valid Google Spreadsheet ID.");
         }
         const spreadsheetId = idMatch[1];
         
-        // 3. Construct a completely clean export address line
+        // 3. Build perfect download link query string structure directly
         const exportUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&cache_bypass=${Date.now()}`;
         
-        // 4. Download Stream payload mapping
+        // 4. Download file data records array matrix payload
         const response = await fetch(exportUrl);
         if (!response.ok) throw new Error(`Google rejected data sync request: ${response.status}`);
         
@@ -86,41 +86,46 @@ async function streamLiveVerification() {
 
         const values = parseCSVLine(matchedRow, delimiter);
         
-        // Set dynamic master uppercase identifier title block
-        document.getElementById('dash-code-display').innerText = (values[0] || userInput).toUpperCase();
+        // 6. Extract Column Values precisely based on your current A, B, C, D setup
+        const voucherCode = (values[0] || userInput).toUpperCase();
+        const startTime   = (values[1] && values[1].trim() !== "") ? values[1].trim() : "-";
+        const status      = (values[2] && values[2].trim() !== "") ? values[2].trim() : "-";
+        const expiration  = (values[3] && values[3].trim() !== "") ? values[3].trim() : "-";
 
-        // Extract column strings array indexes safely avoiding layout overflows
-        const startTime  = (values[1] && values[1].trim() !== "") ? values[1].trim() : "-";
-        const status     = (values[2] && values[2].trim() !== "") ? values[2].trim() : "-";
-        const expiration = (values[3] && values[3].trim() !== "") ? values[3].trim() : "-";
+        // 7. Inject values directly into your exact HTML components elements slots
+        
+        // Header Code Display text slot
+        const codeDisplay = document.getElementById('dash-code-display');
+        if (codeDisplay) codeDisplay.innerText = voucherCode;
 
-        // Dynamic status layout color logic rules
-        let statusColors = "bg-[#F5F5F7] text-gray-900";
-        if (status.toLowerCase().includes('act') || status.toLowerCase().includes('live')) {
-            statusColors = "bg-emerald-50 text-emerald-700 border border-emerald-100/70";
-        } else {
-            statusColors = "bg-amber-50 text-amber-800 border border-amber-100/70";
+        // Status field mapped directly into the data display block
+        const dataDisplay = document.getElementById('dash-data');
+        if (dataDisplay) {
+            dataDisplay.innerText = status.toUpperCase();
+            if (status.toLowerCase().includes('act') || status.toLowerCase().includes('live')) {
+                dataDisplay.className = "text-base font-semibold text-emerald-600 uppercase";
+            } else {
+                dataDisplay.className = "text-base font-semibold text-amber-500 uppercase";
+            }
         }
 
-        // 6. Paint the dashboard grid view directly
-        const container = document.getElementById('festa-data-container');
-        if (container) {
-            container.innerHTML = `
-                <div class="p-4 rounded-2xl flex flex-col justify-center space-y-1 bg-blue-50 text-blue-700 border border-blue-100/70">
-                    <span class="text-[10px] font-bold uppercase tracking-wider opacity-60">Start Time</span>
-                    <span class="text-base font-bold tracking-tight">${startTime}</span>
-                </div>
-                
-                <div class="p-4 rounded-2xl flex flex-col justify-center space-y-1 ${statusColors}">
-                    <span class="text-[10px] font-bold uppercase tracking-wider opacity-60">Status</span>
-                    <span class="text-base font-bold tracking-tight">${status}</span>
-                </div>
-                
-                <div class="p-4 rounded-2xl flex flex-col justify-center space-y-1 bg-rose-50 text-rose-700 border border-rose-100/70">
-                    <span class="text-[10px] font-bold uppercase tracking-wider opacity-60">Expiration Time</span>
-                    <span class="text-base font-bold tracking-tight">${expiration}</span>
+        // Expiration/Start values mapped directly into the duration block
+        const timeDisplay = document.getElementById('dash-time');
+        if (timeDisplay) {
+            timeDisplay.innerHTML = `
+                <div class="flex flex-col text-sm space-y-0.5">
+                    <span class="text-gray-900 font-medium">Start: ${startTime}</span>
+                    <span class="text-rose-600 font-semibold text-xs">Expires: ${expiration}</span>
                 </div>
             `;
+            timeDisplay.className = "mt-1";
+        }
+
+        // Speed badge fallback value
+        const speedBadge = document.getElementById('dash-speed');
+        if (speedBadge) {
+            speedBadge.innerText = "HIGH";
+            speedBadge.className = "text-sm font-medium bg-blue-50 text-blue-600 px-3 py-1 rounded-md uppercase";
         }
 
         renderView('view-dashboard');
@@ -131,26 +136,14 @@ async function streamLiveVerification() {
     }
 }
 
-// Bind native click actions cleanly when the DOM content finishes loading
 document.addEventListener('DOMContentLoaded', () => {
     renderView('view-entry');
     
-    const checkBtn = document.getElementById('check-btn');
-    const backBtn = document.getElementById('back-btn');
-    
-    if (checkBtn) checkBtn.addEventListener('click', streamLiveVerification);
-    if (backBtn) {
-        backBtn.addEventListener('click', () => {
-            const inputEl = document.getElementById('voucher-input');
-            if (inputEl) inputEl.value = '';
-            renderView('view-entry');
-        });
-    }
-    
+    // Setup clean event fallback hooks directly on inputs
     const inputEl = document.getElementById('voucher-input');
     if (inputEl) {
         inputEl.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') streamLiveVerification();
+            if (e.key === 'Enter') window.streamLiveVerification();
         });
     }
 });
