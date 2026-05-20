@@ -1,157 +1,83 @@
-/**
- * Apple Air - Definitive User Portal Verification Engine
- * Strictly Aligned to Project HTML: dash-code-display, dash-data, dash-time
- * Data Mapping: A: code | B: start time | C: status | D: Expirationtime
- */
-
-const BIN_ID = "6a0cacb36877513b279bbe63"; 
-const MASTER_KEY = "$2a$10$LS7aJr2QiV2RpptiyeBA9umWLUV9NV8nYaEVHT91YLShcgX1xNPbC"; 
-
-function renderView(viewId) {
-    ['view-entry', 'view-dashboard', 'view-loading'].forEach(v => {
-        const el = document.getElementById(v);
-        if (el) v === viewId ? el.classList.remove('hidden') : el.classList.add('hidden');
-    });
-}
-
-// Clean CSV column parser supporting text qualifiers perfectly
-function parseCSVLine(text, delimiter) {
-    if (!text) return [];
-    let columns = [];
-    let insideQuotes = false;
-    let currentColumn = '';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Apple Air - Voucher Portal</title>
     
-    for (let i = 0; i < text.length; i++) {
-        let char = text[i];
-        if (char === '\"') {
-            insideQuotes = !insideQuotes;
-        } else if (char === delimiter && !insideQuotes) {
-            columns.push(currentColumn.trim());
-            currentColumn = '';
-        } else {
-            currentColumn += char;
-        }
-    }
-    columns.push(currentColumn.trim());
-    return columns.map(col => col.replace(/^["']|["']$/g, '').trim());
-}
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Apple Air">
+    
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="manifest" href="manifest.json">
 
-async function streamLiveVerification() {
-    const inputEl = document.getElementById('voucher-input');
-    const userInput = inputEl.value.trim().toLowerCase();
-    if (!userInput) return alert('Please enter your voucher code.');
-
-    renderView('view-loading');
-
-    try {
-        // 1. Fetch Cloud Configurations Link from JSONBin backend database
-        const cloudResponse = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
-            headers: { "X-Master-Key": MASTER_KEY }
-        });
-        const cloudData = await cloudResponse.json();
-        const activeUrl = cloudData.record.url;
-        
-        // 2. Extract Core Sheet ID cleanly using a precise matching template
-        const idMatch = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-        if (!idMatch || !idMatch[1]) {
-            throw new Error("Stored URL is missing a valid Google Spreadsheet ID.");
-        }
-        const spreadsheetId = idMatch[1];
-        
-        // 3. Build perfect download link query string structure directly
-        const exportUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&cache_bypass=${Date.now()}`;
-        
-        // 4. Download file data records array matrix payload
-        const response = await fetch(exportUrl);
-        if (!response.ok) throw new Error(`Google rejected data sync request: ${response.status}`);
-        
-        const csvText = await response.text();
-        const rows = csvText.split(/\r?\n/).filter(r => r.trim() !== "");
-        
-        if (rows.length === 0) throw new Error("Spreadsheet rows appear completely empty.");
-
-        // Automatically determine if the sheet uses comma or semicolon delimiters
-        const delimiter = rows[0].includes(';') ? ';' : ',';
-
-        // 5. Match input value string against Key Column A
-        const matchedRow = rows.find(row => {
-            const cols = parseCSVLine(row, delimiter);
-            return cols[0] && cols[0].toLowerCase() === userInput;
-        });
-
-        if (!matchedRow) {
-            alert("Voucher code not found or has expired.");
-            renderView('view-entry');
-            return;
-        }
-
-        const values = parseCSVLine(matchedRow, delimiter);
-        
-        // 6. Extract Column Values precisely based on your current A, B, C, D setup
-        const voucherCode = (values[0] || userInput).toUpperCase();
-        const startTime   = (values[1] && values[1].trim() !== "") ? values[1].trim() : "-";
-        const status      = (values[2] && values[2].trim() !== "") ? values[2].trim() : "-";
-        const expiration  = (values[3] && values[3].trim() !== "") ? values[3].trim() : "-";
-
-        // 7. Inject values directly into your exact HTML components elements slots
-        
-        // Slot 1: Title Header display text
-        const codeDisplayElement = document.getElementById('dash-code-display');
-        if (codeDisplayElement) {
-            codeDisplayElement.innerText = voucherCode;
-        }
-
-        // Slot 2: Map Status into the 'dash-data' text component field block
-        const dataElement = document.getElementById('dash-data');
-        if (dataElement) {
-            dataElement.innerText = status.toUpperCase();
-            // Color code the status text based on active vs inactive profiles
-            if (status.toLowerCase().includes('act') || status.toLowerCase().includes('live')) {
-                dataElement.className = "text-base font-bold text-emerald-600 tracking-wide";
-            } else {
-                dataElement.className = "text-base font-bold text-amber-500 tracking-wide";
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', 'sans-serif'] },
+                    boxShadow: { 'apple': '0 4px 30px rgba(0, 0, 0, 0.02)' }
+                }
             }
         }
+    </script>
+</head>
+<body class="bg-[#F5F5F7] text-[#1D1D1F] min-h-screen flex flex-col justify-between selection:bg-blue-500/10">
+    
+    <header class="w-full py-8 px-6 flex justify-center items-center">
+        <div class="flex items-center space-x-3">
+            <div class="w-12 h-12 rounded-2xl bg-white border border-gray-200/60 shadow-apple flex items-center justify-center">
+                <span class="text-2xl font-semibold opacity-85 select-none"></span>
+            </div>
+            <span class="text-xl font-bold tracking-tight text-[#1D1D1F]">Apple Air</span>
+        </div>
+    </header>
 
-        // Slot 3: Map Start and Expiration Times into the 'dash-time' block layout text area
-        const timeElement = document.getElementById('dash-time');
-        if (timeElement) {
-            timeElement.innerHTML = `
-                <div class="text-left space-y-1 mt-1 text-xs font-medium text-gray-500">
-                    <div><span class="font-bold text-gray-800 text-[10px] uppercase tracking-wider block">Started:</span> ${startTime}</div>
-                    <div class="pt-1"><span class="font-bold text-rose-600 text-[10px] uppercase tracking-wider block">Expires:</span> ${expiration}</div>
+    <main class="w-full max-w-md mx-auto px-5 flex-grow flex flex-col justify-center items-center">
+        
+        <div id="view-entry" class="w-full bg-white rounded-3xl p-6 shadow-apple border border-gray-100/80 space-y-6">
+            <div class="text-center space-y-2">
+                <h1 class="text-2xl font-bold tracking-tight">Voucher Verification</h1>
+                <p class="text-xs text-[#86868B] max-w-[280px] mx-auto">Enter your credentials below to pull live validation profiles directly from database.</p>
+            </div>
+            <div class="space-y-4">
+                <input type="text" id="voucher-input" placeholder="Enter Voucher Code" autocomplete="off" class="w-full px-4 py-4 bg-[#F5F5F7] rounded-2xl text-base font-bold text-center uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-inner tracking-widest placeholder:tracking-normal placeholder:font-normal">
+                <button id="check-btn" class="w-full py-4 bg-[#0071E3] hover:bg-[#0077ED] text-white font-semibold rounded-2xl shadow-sm transition-colors tracking-wide">Check Validity</button>
+            </div>
+        </div>
+
+        <div id="view-dashboard" class="w-full space-y-4 hidden">
+            <div class="bg-white rounded-3xl p-6 shadow-apple border border-gray-100/80 space-y-6">
+                
+                <div class="flex items-center justify-between border-b border-gray-100 pb-4">
+                    <div>
+                        <p class="text-[10px] font-bold text-[#86868B] uppercase tracking-widest mb-0.5">Active Voucher</p>
+                        <h2 id="dash-code-display" class="text-lg font-bold font-mono tracking-wide text-gray-900">-</h2>
+                    </div>
+                    <span class="text-[11px] font-bold px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/60 flex items-center gap-1.5 select-none animate-pulse">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Live Profile
+                    </span>
                 </div>
-            `;
-        }
 
-        // Switch panel layout display layers visibility flags tracking
-        renderView('view-dashboard');
+                <div id="festa-data-container" class="grid grid-cols-1 gap-3">
+                    </div>
+            </div>
 
-    } catch (err) {
-        alert("Sync pipeline error: " + err.message);
-        renderView('view-entry');
-    }
-}
+            <button id="back-btn" class="w-full py-4 bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 text-sm font-semibold rounded-2xl transition-colors tracking-wide">Check Another Voucher</button>
+        </div>
 
-document.addEventListener('DOMContentLoaded', () => {
-    renderView('view-entry');
-    
-    const checkBtn = document.getElementById('check-btn');
-    const backBtn = document.getElementById('back-btn');
-    
-    if (checkBtn) checkBtn.addEventListener('click', streamLiveVerification);
-    if (backBtn) {
-        backBtn.addEventListener('click', () => {
-            const inputEl = document.getElementById('voucher-input');
-            if (inputEl) inputEl.value = '';
-            renderView('view-entry');
-        });
-    }
-    
-    const inputEl = document.getElementById('voucher-input');
-    if (inputEl) {
-        inputEl.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') streamLiveVerification();
-        });
-    }
-});
+        <div id="view-loading" class="hidden flex flex-col items-center space-y-3 py-14 select-none">
+            <div class="w-8 h-8 border-[3px] border-gray-200 border-t-black rounded-full animate-spin"></div>
+            <p class="text-xs font-semibold text-[#86868B] tracking-wide">Syncing real-time records...</p>
+        </div>
+    </main>
+
+    <footer class="w-full py-6 text-center text-[10px] font-medium text-[#86868B] tracking-wide select-none">
+        &copy; 2026 Apple Air Infrastructure. All rights reserved.
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
