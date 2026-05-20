@@ -1,5 +1,6 @@
 /**
- * Apple Air - Fixed Voucher Portal Engine (404 Error Fixed)
+ * Apple Air - High-Performance Voucher Verification Engine
+ * Core Structure: A: code | B: start time | C: status | D: Expirationtime
  */
 
 const BIN_ID = "6a0cacb36877513b279bbe63"; 
@@ -12,7 +13,7 @@ function renderView(viewId) {
     });
 }
 
-// Clean CSV Line Parser to split columns correctly
+// Robust CSV column parser supporting wrapped quotation data values safely
 function parseCSVLine(text, delimiter) {
     if (!text) return [];
     let columns = [];
@@ -42,36 +43,36 @@ async function streamLiveVerification() {
     renderView('view-loading');
 
     try {
-        // 1. Fetch Cloud Link from JSONBin configuration
+        // 1. Fetch Cloud Configurations Link
         const cloudResponse = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
             headers: { "X-Master-Key": MASTER_KEY }
         });
         const cloudData = await cloudResponse.json();
-        let activeUrl = cloudData.record.url;
+        const activeUrl = cloudData.record.url;
         
-        // 2. Clean up URL to create a reliable export path
-        let exportUrl = "";
-        if (activeUrl.includes('/export')) {
-            exportUrl = activeUrl.replace(/cache_bypass=\d+/, `cache_bypass=${Date.now()}`);
-        } else {
-            // Convert standard view links directly to CSV layout downloads
-            const cleanBase = activeUrl.split('/edit')[0].split('/view')[0];
-            exportUrl = `${cleanBase}/export?format=csv&cache_bypass=${Date.now()}`;
+        // 2. Strict Core Sheet ID Regex Extractor Extraction
+        const idMatch = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (!idMatch || !idMatch[1]) {
+            throw new Error("The URL stored in the admin panel is missing a valid Google Spreadsheet ID.");
         }
+        const spreadsheetId = idMatch[1];
         
-        // 3. Stream data from the built export link
+        // 3. Construct a completely clean, pristine export address line
+        const exportUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&cache_bypass=${Date.now()}`;
+        
+        // 4. Download Stream payload mapping
         const response = await fetch(exportUrl);
-        if (!response.ok) throw new Error(`Spreadsheet fetch failed with status: ${response.status}`);
+        if (!response.ok) throw new Error(`Google rejected fetch requests with error status code: ${response.status}`);
         
         const csvText = await response.text();
         const rows = csvText.split(/\r?\n/).filter(r => r.trim() !== "");
         
-        if (rows.length === 0) throw new Error("Spreadsheet database is completely empty.");
+        if (rows.length === 0) throw new Error("Spreadsheet database rows appear completely blank.");
 
-        // Detect splitting rules (comma vs semicolon)
+        // Automatically determine if the system uses comma or semicolon field mapping rules
         const delimiter = rows[0].includes(';') ? ';' : ',';
 
-        // 4. Match user row against Column A (Voucher Code)
+        // 5. Target client input code directly inside Column A values list matches
         const matchedRow = rows.find(row => {
             const cols = parseCSVLine(row, delimiter);
             return cols[0] && cols[0].toLowerCase() === userInput;
@@ -85,10 +86,10 @@ async function streamLiveVerification() {
 
         const values = parseCSVLine(matchedRow, delimiter);
         
-        // Set up code display value at top
+        // Set dynamic master uppercase identifier title block
         document.getElementById('dash-code-display').innerText = (values[0] || userInput).toUpperCase();
 
-        // Safe index extraction from rows A, B, C, D
+        // Extract values from columns structural positions cleanly
         const startTime  = (values[1] && values[1].trim() !== "") ? values[1].trim() : "-";
         const status     = (values[2] && values[2].trim() !== "") ? values[2].trim() : "-";
         const expiration = (values[3] && values[3].trim() !== "") ? values[3].trim() : "-";
@@ -100,7 +101,7 @@ async function streamLiveVerification() {
             statusColors = "bg-amber-50 text-amber-800 border border-amber-100/70";
         }
 
-        // 5. Update user dashboard grid display layout blocks
+        // 6. Paint the dashboard grid view directly
         const container = document.getElementById('festa-data-container');
         container.innerHTML = `
             <div class="p-4 rounded-2xl flex flex-col justify-center space-y-1 bg-blue-50 text-blue-700 border border-blue-100/70">
@@ -122,7 +123,7 @@ async function streamLiveVerification() {
         renderView('view-dashboard');
 
     } catch (err) {
-        alert("Sync connection issue: " + err.message);
+        alert("Sync error configuration: " + err.message);
         renderView('view-entry');
     }
 }
