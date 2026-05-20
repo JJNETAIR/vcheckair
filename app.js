@@ -1,6 +1,5 @@
 /**
- * Apple Air - Fixed Voucher Portal Engine
- * Aligned strictly to: A: code | B: start time | C: status | D: Expirationtime
+ * Apple Air - Fixed Voucher Portal Engine (404 Error Fixed)
  */
 
 const BIN_ID = "6a0cacb36877513b279bbe63"; 
@@ -13,7 +12,7 @@ function renderView(viewId) {
     });
 }
 
-// Safe CSV Parser line splitter
+// Clean CSV Line Parser to split columns correctly
 function parseCSVLine(text, delimiter) {
     if (!text) return [];
     let columns = [];
@@ -43,25 +42,36 @@ async function streamLiveVerification() {
     renderView('view-loading');
 
     try {
-        // 1. Fetch Cloud Config
+        // 1. Fetch Cloud Link from JSONBin configuration
         const cloudResponse = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
             headers: { "X-Master-Key": MASTER_KEY }
         });
         const cloudData = await cloudResponse.json();
-        const activeUrl = cloudData.record.url;
-        const spreadsheetId = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)[1];
+        let activeUrl = cloudData.record.url;
         
-        // 2. Fetch Spreadsheet Data with aggressive Cache Buster
-        const response = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&cache_bypass=${Date.now()}`);
+        // 2. Clean up URL to create a reliable export path
+        let exportUrl = "";
+        if (activeUrl.includes('/export')) {
+            exportUrl = activeUrl.replace(/cache_bypass=\d+/, `cache_bypass=${Date.now()}`);
+        } else {
+            // Convert standard view links directly to CSV layout downloads
+            const cleanBase = activeUrl.split('/edit')[0].split('/view')[0];
+            exportUrl = `${cleanBase}/export?format=csv&cache_bypass=${Date.now()}`;
+        }
+        
+        // 3. Stream data from the built export link
+        const response = await fetch(exportUrl);
+        if (!response.ok) throw new Error(`Spreadsheet fetch failed with status: ${response.status}`);
+        
         const csvText = await response.text();
         const rows = csvText.split(/\r?\n/).filter(r => r.trim() !== "");
         
-        if (rows.length === 0) throw new Error("Spreadsheet database is empty.");
+        if (rows.length === 0) throw new Error("Spreadsheet database is completely empty.");
 
-        // Detect comma vs semicolon splitting rules
+        // Detect splitting rules (comma vs semicolon)
         const delimiter = rows[0].includes(';') ? ';' : ',';
 
-        // 3. Match user row targeting Column A (Voucher Code)
+        // 4. Match user row against Column A (Voucher Code)
         const matchedRow = rows.find(row => {
             const cols = parseCSVLine(row, delimiter);
             return cols[0] && cols[0].toLowerCase() === userInput;
@@ -75,15 +85,14 @@ async function streamLiveVerification() {
 
         const values = parseCSVLine(matchedRow, delimiter);
         
-        // Set up the voucher display at the top header
+        // Set up code display value at top
         document.getElementById('dash-code-display').innerText = (values[0] || userInput).toUpperCase();
 
-        // 4. Fallback values if sheet rows are truncated/short
+        // Safe index extraction from rows A, B, C, D
         const startTime  = (values[1] && values[1].trim() !== "") ? values[1].trim() : "-";
         const status     = (values[2] && values[2].trim() !== "") ? values[2].trim() : "-";
         const expiration = (values[3] && values[3].trim() !== "") ? values[3].trim() : "-";
 
-        // Dynamic status layout styling color variables
         let statusColors = "bg-[#F5F5F7] text-gray-900";
         if (status.toLowerCase().includes('act') || status.toLowerCase().includes('live')) {
             statusColors = "bg-emerald-50 text-emerald-700 border border-emerald-100/70";
@@ -91,7 +100,7 @@ async function streamLiveVerification() {
             statusColors = "bg-amber-50 text-amber-800 border border-amber-100/70";
         }
 
-        // 5. Explicit structural card UI build out injection
+        // 5. Update user dashboard grid display layout blocks
         const container = document.getElementById('festa-data-container');
         container.innerHTML = `
             <div class="p-4 rounded-2xl flex flex-col justify-center space-y-1 bg-blue-50 text-blue-700 border border-blue-100/70">
