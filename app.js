@@ -1,6 +1,6 @@
 /**
  * Apple Air - High-Performance Realtime Sync Database Core
- * Mapping Layout: A: code | B: start time | C: status | D: Expirationtime
+ * Structural Matrix Rules: A: code | B: start time | C: status | D: Expirationtime
  */
 
 const BIN_ID = "6a0cacb36877513b279bbe63"; 
@@ -13,7 +13,7 @@ function renderView(viewId) {
     });
 }
 
-// Clean text data line format parsing utility
+// Custom split parser handling internal column commas safely
 function parseCSVLine(text, delimiter) {
     if (!text) return [];
     let columns = [];
@@ -35,6 +35,7 @@ function parseCSVLine(text, delimiter) {
     return columns.map(col => col.replace(/^["']|["']$/g, '').trim());
 }
 
+// FIX 1: Expose streamLiveVerification globally for the Check Button
 window.streamLiveVerification = async function() {
     const inputEl = document.getElementById('voucher-input');
     const userInput = inputEl.value.trim().toLowerCase();
@@ -50,14 +51,14 @@ window.streamLiveVerification = async function() {
         const cloudData = await cloudResponse.json();
         const activeUrl = cloudData.record.url;
         
-        // 2. Extract Core Sheet ID cleanly using a precise matching template
+        // 2. Strict Core Sheet ID Regex Extractor
         const idMatch = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
         if (!idMatch || !idMatch[1]) {
             throw new Error("Stored URL is missing a valid Google Spreadsheet ID.");
         }
         const spreadsheetId = idMatch[1];
         
-        // 3. Build perfect download link query string structure directly
+        // 3. Construct clean export download address line
         const exportUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&cache_bypass=${Date.now()}`;
         
         // 4. Download file data records array matrix payload
@@ -93,12 +94,9 @@ window.streamLiveVerification = async function() {
         const expiration  = (values[3] && values[3].trim() !== "") ? values[3].trim() : "-";
 
         // 7. Inject values directly into your exact HTML components elements slots
-        
-        // Header Code Display text slot
         const codeDisplay = document.getElementById('dash-code-display');
         if (codeDisplay) codeDisplay.innerText = voucherCode;
 
-        // Status field mapped directly into the data display block
         const dataDisplay = document.getElementById('dash-data');
         if (dataDisplay) {
             dataDisplay.innerText = status.toUpperCase();
@@ -109,19 +107,17 @@ window.streamLiveVerification = async function() {
             }
         }
 
-        // Expiration/Start values mapped directly into the duration block
         const timeDisplay = document.getElementById('dash-time');
         if (timeDisplay) {
             timeDisplay.innerHTML = `
                 <div class="flex flex-col text-sm space-y-0.5">
-                    <span class="text-gray-900 font-medium">Start: ${startTime}</span>
+                    <span class="text-gray-900 font-medium">Started: ${startTime}</span>
                     <span class="text-rose-600 font-semibold text-xs">Expires: ${expiration}</span>
                 </div>
             `;
-            timeDisplay.className = "mt-1";
+            timeDisplay.className = "text-base font-semibold text-gray-900";
         }
 
-        // Speed badge fallback value
         const speedBadge = document.getElementById('dash-speed');
         if (speedBadge) {
             speedBadge.innerText = "HIGH";
@@ -136,10 +132,21 @@ window.streamLiveVerification = async function() {
     }
 }
 
+// FIX 2: Expose backToEntryView globally for the "Check Another Voucher" Button
+window.backToEntryView = function() {
+    const inputEl = document.getElementById('voucher-input');
+    if (inputEl) inputEl.value = '';
+    
+    const notifySection = document.getElementById('notification-section');
+    if (notifySection) notifySection.classList.add('hidden');
+    
+    renderView('view-entry');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     renderView('view-entry');
     
-    // Setup clean event fallback hooks directly on inputs
+    // Add enter key fallback mapping tracking natively on the input field box
     const inputEl = document.getElementById('voucher-input');
     if (inputEl) {
         inputEl.addEventListener('keypress', (e) => {
