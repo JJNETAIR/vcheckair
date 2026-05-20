@@ -288,23 +288,13 @@
                 const rows = csvText.split(/\r?\n/);
                 let delimiter = rows[0].includes(';') ? ';' : ',';
                 
-                // ✅ FIXED: Strip headers to pure alphanumeric for reliable matching
-                const rawHeaders = parseCSVLine(rows[0], delimiter);
-                const headers = rawHeaders.map(h => h.toLowerCase().replace(/[^a-z0-9]/g, '').trim());
-
-                // ✅ FIXED: Map actual Google Sheet columns: code, starttime, status, Expirationtime
-                // BUG WAS: timeColumnIndex matched 'starttime' (col B) instead of 'expirationtime' (col D)
-                // FIX: Prefer 'expiration' match first, only fall back to plain 'time' if nothing else found
-                const codeColumnIndex = headers.findIndex(h => h === 'code' || h.includes('code') || h.includes('voucher'));
-                const startTimeColumnIndex = headers.findIndex(h => h === 'starttime' || (h.includes('start') && h.includes('time')));
-                const statusColumnIndex = headers.findIndex(h => h === 'status');
-                const expiryColumnIndex = headers.findIndex(h => h.includes('expiration') || h.includes('expiry') || (h.includes('expir') && h.includes('time')));
-
-                // Fallback to positional columns if headers are unrecognised (col A=0, B=1, C=2, D=3)
-                const colCode   = codeColumnIndex   !== -1 ? codeColumnIndex   : 0;
-                const colStart  = startTimeColumnIndex !== -1 ? startTimeColumnIndex : 1;
-                const colStatus = statusColumnIndex  !== -1 ? statusColumnIndex  : 2;
-                const colExpiry = expiryColumnIndex  !== -1 ? expiryColumnIndex  : 3;
+                // FIXED: Use positional columns - most reliable since sheet layout is always known
+                // Sheet: A(0)=code, B(1)=starttime, C(2)=status, D(3)=Expirationtime
+                // Header-name matching fails when Google Sheets wraps headers with newlines in CSV export
+                const colCode   = 0;
+                const colStart  = 1;
+                const colStatus = 2;
+                const colExpiry = 3;
 
                 let foundVoucher = null;
 
@@ -319,9 +309,9 @@
                     if (cleanedSheetCode.toLowerCase() === userInput) {
                         foundVoucher = {
                             code: cleanedSheetCode.toUpperCase(),
-                            startTime: (columns[colStart] || '').replace(/[\r\n]+/g, ' ').trim(),
-                            status: (columns[colStatus] || '').replace(/[\r\n]+/g, ' ').trim().toLowerCase(),
-                            expiryText: (columns[colExpiry] || '').replace(/[\r\n]+/g, ' ').trim()
+                            startTime: (columns[colStart] || '').replace(/[\r\n]+/g, ' ').replace(/["']/g, '').trim(),
+                            status: (columns[colStatus] || '').replace(/[\r\n\t"']+/g, '').trim().toLowerCase(),
+                            expiryText: (columns[colExpiry] || '').replace(/[\r\n]+/g, ' ').replace(/["']/g, '').trim()
                         };
                         break;
                     }
@@ -334,7 +324,8 @@
                 }
 
                 // ✅ FIXED: Use the 'status' column from the sheet as the primary validity check
-                const sheetSaysValid = foundVoucher.status === 'valid';
+                // Accept 'valid' anywhere in the status cell (handles extra whitespace/chars)
+                const sheetSaysValid = foundVoucher.status.includes('valid');
 
                 // Also calculate days remaining from Expirationtime for display
                 const today = new Date();
