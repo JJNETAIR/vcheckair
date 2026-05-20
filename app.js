@@ -12,7 +12,6 @@ function renderView(viewId) {
     });
 }
 
-// 🛠️ HEAVY DUTY CLEANER PARSER (Handles Festa Tab/Comma line splits perfectly)
 function parseCSVLine(text, delimiter) {
     let columns = [];
     let insideQuotes = false;
@@ -101,7 +100,7 @@ async function streamLiveVerification() {
         if (!activeUrl) throw new Error("JSONBin mapping target missing.");
 
         const match = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-        if (!match) throw new Error("Google unique sheet link ID could not be parsed.");
+        if (!match) throw new Error("Google sheet ID could not be parsed.");
         
         const spreadsheetId = match[1];
         const csvEndpoint = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&cache_bypass=${Date.now()}`;
@@ -111,24 +110,19 @@ async function streamLiveVerification() {
         
         const csvText = await response.text();
         const rows = csvText.split(/\r?\n/);
-        if (rows.length < 2) throw new Error("Database sheet contains empty rows.");
+        if (rows.length < 2) throw new Error("Database sheet is empty.");
 
         let delimiter = rows[0].includes(';') ? ';' : ',';
-        const rawHeaders = parseCSVLine(rows[0], delimiter);
-        
-        // Match columns cleanly by mapping out strings exactly
-        const headersCleaned = rawHeaders.map(h => h.toLowerCase().replace(/[^a-z0-9]/g, '').trim());
-        
-        let codeIdx = headersCleaned.findIndex(h => h.includes('vouch') || h.includes('code'));
-        let profileIdx = headersCleaned.findIndex(h => h.includes('profi') || h.includes('rate') || h.includes('tier') || h.includes('pkg'));
-        let durationIdx = headersCleaned.findIndex(h => h.includes('durat') || h.includes('time') || h.includes('valid'));
-        let dataIdx = headersCleaned.findIndex(h => h.includes('data') || h.includes('limit') || h.includes('allow') || h.includes('volum'));
 
-        // Absolute safe fallback offsets if header strings fail to match perfectly
-        if (codeIdx === -1) codeIdx = 0;
-        if (profileIdx === -1) profileIdx = 1;
-        if (durationIdx === -1) durationIdx = 2;
-        if (dataIdx === -1) dataIdx = 3;
+        // Direct Column Mapping Positions based on your sheet layout:
+        // Column A = 0 (Voucher Code)
+        // Column B = 1 (Start Time)
+        // Column C = 2 (Duration)
+        // Column D = 3 (Expiration Time)
+        let codeIdx = 0;
+        let startTimeIdx = 1;
+        let durationIdx = 2;
+        let expirationIdx = 3;
 
         let matchedRowFields = null;
 
@@ -156,35 +150,38 @@ async function streamLiveVerification() {
         const gridContainer = document.getElementById('festa-data-container');
         gridContainer.innerHTML = ''; 
 
+        // Extract raw data fields safely
         let voucherCodeDisplay = (matchedRowFields[codeIdx] || userInput).toUpperCase();
-        let speedProfileVal = matchedRowFields[profileIdx] || 'Standard Plan';
-        let durationVal = matchedRowFields[durationIdx] || 'Unlimited';
-        let dataAllowanceVal = matchedRowFields[dataIdx] || 'Unlimited Data';
+        let startTimeVal = matchedRowFields[startTimeIdx] || 'Not Activated Yet';
+        let durationVal = matchedRowFields[durationIdx] || '--';
+        let expirationVal = matchedRowFields[expirationIdx] || 'No Limit';
 
+        // Clean any linebreaks
+        voucherCodeDisplay = voucherCodeDisplay.replace(/[\r\n]+/g, ' ').trim();
+        startTimeVal = startTimeVal.replace(/[\r\n]+/g, ' ').trim();
+        durationVal = durationVal.replace(/[\r\n]+/g, ' ').trim();
+        expirationVal = expirationVal.replace(/[\r\n]+/g, ' ').trim();
+
+        // Check if voucher has expired based on Column D (Expiration Time)
         let isExpired = false;
-        const expiryDate = parseSheetDateString(durationVal);
+        const expiryDate = parseSheetDateString(expirationVal);
         if (expiryDate && !isNaN(expiryDate.getTime())) {
             const today = new Date();
             if (expiryDate.getTime() < today.getTime()) {
                 isExpired = true;
             } else {
                 const diffDays = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                if (diffDays > 1) durationVal += ` (${diffDays} Days Left)`;
-                else if (diffDays === 1) durationVal += ` (1 Day Left)`;
-                else durationVal += ` (Expires Today)`;
+                if (diffDays > 1) expirationVal += ` (${diffDays} Days Left)`;
+                else if (diffDays === 1) expirationVal += ` (1 Day Left)`;
+                else expirationVal += ` (Expires Today)`;
             }
         }
 
-        // Clean out any raw double line breaks from the values
-        speedProfileVal = speedProfileVal.replace(/[\r\n]+/g, ' ').trim();
-        durationVal = durationVal.replace(/[\r\n]+/g, ' ').trim();
-        dataAllowanceVal = dataAllowanceVal.replace(/[\r\n]+/g, ' ').trim();
-
-        // 🍎 Build clean design layout rows right inside the card frame
+        // 🍎 Render exactly what you asked for onto the user dashboard card
         gridContainer.innerHTML += createDisplayRow("Voucher Code", voucherCodeDisplay, false);
-        gridContainer.innerHTML += createDisplayRow("Speed Profile", speedProfileVal, false);
-        gridContainer.innerHTML += createDisplayRow("Duration Limit", isExpired ? "Expired" : durationVal, !isExpired);
-        gridContainer.innerHTML += createDisplayRow("Data Allowance", dataAllowanceVal, false);
+        gridContainer.innerHTML += createDisplayRow("Start Time", startTimeVal, false);
+        gridContainer.innerHTML += createDisplayRow("Plan Duration", durationVal, false);
+        gridContainer.innerHTML += createDisplayRow("Expiration Time", isExpired ? "Expired" : expirationVal, !isExpired);
 
         document.getElementById('dash-code-display').innerText = voucherCodeDisplay;
 
