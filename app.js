@@ -1,3 +1,7 @@
+/**
+ * Apple Air - User Portal Interface Engine (Fixed Sync Engine)
+ */
+
 const BIN_ID = "6a0cacb36877513b279bbe63"; 
 const MASTER_KEY = "$2a$10$LS7aJr2QiV2RpptiyeBA9umWLUV9NV8nYaEVHT91YLShcgX1xNPbC"; 
 
@@ -8,8 +12,9 @@ function renderView(viewId) {
     });
 }
 
-// Fixed line parser that auto-detects comma vs semicolon
+// Robust CSV Line Parser
 function parseCSVLine(text, delimiter) {
+    if (!text) return [];
     let columns = [];
     let insideQuotes = false;
     let currentColumn = '';
@@ -37,7 +42,7 @@ async function streamLiveVerification() {
     renderView('view-loading');
 
     try {
-        // 1. Get Google Sheet ID from JSONBin cloud configuration
+        // 1. Fetch Google Sheet ID from JSONBin cloud configuration
         const cloudResponse = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
             headers: { "X-Master-Key": MASTER_KEY }
         });
@@ -45,20 +50,20 @@ async function streamLiveVerification() {
         const activeUrl = cloudData.record.url;
         const spreadsheetId = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)[1];
         
-        // 2. Fetch data directly from CSV Export link
+        // 2. Fetch data directly from CSV Export link with cache buster
         const response = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&cache_bypass=${Date.now()}`);
         const csvText = await response.text();
         const rows = csvText.split(/\r?\n/).filter(r => r.trim() !== "");
         
         if (rows.length === 0) throw new Error("Spreadsheet data is completely empty.");
 
-        // 🎯 Auto-Detect correct delimiter (comma vs semicolon)
-        const firstRow = rows[0];
-        const delimiter = firstRow.includes(';') ? ';' : ',';
+        // Auto-Detect delimiter (comma vs semicolon)
+        const delimiter = rows[0].includes(';') ? ';' : ',';
 
-        // 3. Extract Headers & Match User Input row
+        // 3. Extract Headers
         const headers = parseCSVLine(rows[0], delimiter);
         
+        // Find the matched row safely
         const matchedRow = rows.find(row => {
             const cols = parseCSVLine(row, delimiter);
             return cols[0] && cols[0].toLowerCase() === userInput;
@@ -72,27 +77,28 @@ async function streamLiveVerification() {
 
         const values = parseCSVLine(matchedRow, delimiter);
         
-        // Update header block title code text
-        document.getElementById('dash-code-display').innerText = values[0].toUpperCase();
+        // Safely show voucher code at top header
+        document.getElementById('dash-code-display').innerText = (values[0] || userInput).toUpperCase();
 
         const container = document.getElementById('festa-data-container');
-        container.innerHTML = ''; // Clear out the placeholder cards
+        container.innerHTML = ''; 
 
-        // 4. Construct dynamic grid lists using matching headers layout
+        // 4. Construct dynamic grid metrics safely
         headers.forEach((header, index) => {
-            if (index === 0 || !header) return; // Skip displaying voucher column twice
+            if (index === 0 || !header) return; // Skip voucher code card row
 
-            const val = values[index] ? values[index] : "0";
+            // Fallback to "-" safely if values[index] is missing or undefined
+            const val = (values[index] !== undefined && values[index] !== "") ? values[index] : "-";
             const cleanHeader = header.toLowerCase();
 
-            // Distinctive color-badge configurations for each cell condition
+            // Premium premium color accents matching data purpose
             let cardColors = "bg-[#F5F5F7] text-gray-900";
             if (cleanHeader.includes('remain')) {
-                cardColors = "bg-blue-50 text-blue-700 border border-blue-100";
+                cardColors = "bg-blue-50 text-blue-700 border border-blue-100/70";
             } else if (cleanHeader.includes('expir')) {
-                cardColors = "bg-rose-50 text-rose-700 border border-rose-100";
+                cardColors = "bg-rose-50 text-rose-700 border border-rose-100/70";
             } else if (cleanHeader.includes('used')) {
-                cardColors = "bg-amber-50 text-amber-800";
+                cardColors = "bg-amber-50/70 text-amber-800";
             }
 
             container.innerHTML += `
@@ -111,9 +117,24 @@ async function streamLiveVerification() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('check-btn').addEventListener('click', streamLiveVerification);
-    document.getElementById('back-btn').addEventListener('click', () => {
-        document.getElementById('voucher-input').value = '';
-        renderView('view-entry');
-    });
+    renderView('view-entry');
+    
+    const checkBtn = document.getElementById('check-btn');
+    const backBtn = document.getElementById('back-btn');
+    
+    if (checkBtn) checkBtn.addEventListener('click', streamLiveVerification);
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            const inputEl = document.getElementById('voucher-input');
+            if (inputEl) inputEl.value = '';
+            renderView('view-entry');
+        });
+    }
+    
+    const inputEl = document.getElementById('voucher-input');
+    if (inputEl) {
+        inputEl.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') streamLiveVerification();
+        });
+    }
 });
