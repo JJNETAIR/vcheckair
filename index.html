@@ -65,7 +65,7 @@
             <div class="bg-white/50 border border-gray-100 rounded-2xl overflow-hidden divide-y divide-gray-100 shadow-inner">
                 <div class="flex justify-between items-center px-5 py-4">
                     <span class="text-sm font-medium text-[#86868B]">Time Remaining</span>
-                    <span id="dash-time" class="text-base font-semibold text-right max-w-[200px]">--</span>
+                    <span id="dash-time" class="text-base font-semibold text-right max-w-[220px] leading-tight text-gray-900">--</span>
                 </div>
                 <div class="flex justify-between items-center px-5 py-4">
                     <span class="text-sm font-medium text-[#86868B]">Data Allowance</span>
@@ -110,8 +110,7 @@
             });
         }
 
-        // 🛡️ INTELLIGENT CSV LINE SPLITTER
-        // Safely skips commas that live inside double quotes (e.g. "Jun 15, 2026")
+        // 🛡️ ACCURATE CSV TOKENIZER
         function parseCSVLine(text, delimiter) {
             let columns = [];
             let insideQuotes = false;
@@ -132,25 +131,53 @@
             return columns;
         }
 
-        // 📅 ROBUST TIMESTAMP DECODER
+        // 📅 ABSOLUTE DATE INTERPRETER (With multi-line wrap cleanup)
         function parseSheetDateString(str) {
             if (!str) return null;
-            let cleanedStr = str.replace(/am/i, ' AM').replace(/pm/i, ' PM').trim();
-            const parsedTimestamp = Date.parse(cleanedStr);
-            if (!isNaN(parsedTimestamp)) {
-                return new Date(parsedTimestamp);
+            
+            // 🔥 CRITICAL FIX: Strip away internal line breaks (\n or \r) caused by cell text wrapping
+            let sanitized = str.replace(/[\r\n]+/g, ' ').trim();
+            
+            // Clean up special characters but preserve necessary space gaps
+            let clean = sanitized.replace(/[^a-zA-Z0-9\s:]/g, ' ').replace(/\s+/g, ' ').trim();
+            let segments = clean.split(' ');
+            
+            if (segments.length < 3) return null;
+
+            const months = {
+                jan:0, feb:1, mar:2, apr:3, may:4, jun:5,
+                jul:6, aug:7, sep:8, oct:9, nov:10, dec:11
+            };
+
+            let monthStr = segments[0].toLowerCase().substring(0, 3);
+            let month = months[monthStr];
+            let day = parseInt(segments[1], 10);
+            let year = parseInt(segments[2], 10);
+
+            if (isNaN(month) || isNaN(day) || isNaN(year)) {
+                const backupParts = sanitized.split('/');
+                if (backupParts.length === 3) {
+                    return new Date(parseInt(backupParts[2],10), parseInt(backupParts[1],10)-1, parseInt(backupParts[0],10));
+                }
+                return null;
             }
-            const parts = str.split('/');
-            if (parts.length === 3) {
-                const day = parseInt(parts[0], 10);
-                const month = parseInt(parts[1], 10) - 1; 
-                const year = parseInt(parts[2], 10);
-                return new Date(year, month, day);
+
+            let hours = 0, minutes = 0, seconds = 0;
+            let timeMatch = clean.match(/(\d{2}):(\d{2}):(\d{2})/);
+            
+            if (timeMatch) {
+                hours = parseInt(timeMatch[1], 10);
+                minutes = parseInt(timeMatch[2], 10);
+                seconds = parseInt(timeMatch[3], 10);
             }
-            return null;
+
+            if (/pm/i.test(sanitized) && hours < 12) hours += 12;
+            if (/am/i.test(sanitized) && hours === 12) hours = 0;
+
+            return new Date(year, month, day, hours, minutes, seconds);
         }
 
-        // 🔔 REMINDER STORAGE CONTROLLER
+        // 🔔 LOCAL REMINDER STORAGE ENGINE
         function setupNotification(expiryDateString, voucherCode) {
             const notifySection = document.getElementById('notification-section');
             const notifyBtn = document.getElementById('notify-me-btn');
@@ -228,7 +255,7 @@
             };
         }
 
-        // ⚡ DATA CORRELATION ENGINE
+        // ⚡ REAL-TIME NETWORK CORRELATION STREAM
         async function streamLiveVerification() {
             const userInput = document.getElementById('voucher-input').value.trim().toLowerCase();
             if (!userInput) return alert('Please enter a voucher code.');
@@ -242,10 +269,10 @@
                 const cloudData = await cloudResponse.json();
                 const activeUrl = cloudData.record.url;
 
-                if (!activeUrl) throw new Error("Invalid Cloud Sync Target URL.");
+                if (!activeUrl) throw new Error("Invalid Redirect URL.");
 
                 const match = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-                if (!match) throw new Error("Malformed URL target hash parameters.");
+                if (!match) throw new Error("Malformed document redirection URL mapping.");
                 
                 const spreadsheetId = match[1];
                 const csvEndpoint = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=0&cache_bypass=${Date.now()}`;
@@ -256,7 +283,6 @@
                 const rows = csvText.split(/\r?\n/);
                 let delimiter = rows[0].includes(';') ? ';' : ',';
                 
-                // Read and normalize headers safely
                 const headers = parseCSVLine(rows[0], delimiter).map(h => h.toLowerCase());
                 
                 const codeColumnIndex = headers.findIndex(h => h.includes('code') || h.includes('authorize') || h.includes('voucher'));
@@ -264,7 +290,7 @@
                 const speedColumnIndex = headers.findIndex(h => h.includes('speed') || h.includes('tier') || h.includes('profile'));
 
                 if (codeColumnIndex === -1 || timeColumnIndex === -1) {
-                    alert("Header Match Error: Ensure columns contain 'code' and 'expiration time'.");
+                    alert("Header configuration layout not matched within target sheets row.");
                     renderView('view-entry');
                     return;
                 }
@@ -274,7 +300,6 @@
                 for (let i = 1; i < rows.length; i++) {
                     if (!rows[i].trim()) continue;
                     
-                    // Use smart column parser to safely bypass quoted date commas
                     const columns = parseCSVLine(rows[i], delimiter);
                     
                     if (columns[codeColumnIndex]) {
@@ -299,7 +324,10 @@
 
                 const today = new Date();
                 const expiryDate = parseSheetDateString(foundVoucher.expiryText);
-                let combinedDisplayString = foundVoucher.expiryText; 
+                
+                // Clean internal cell breaks out of data presentation display as well
+                let finalExpiryDisplay = foundVoucher.expiryText.replace(/[\r\n]+/g, ' ').trim();
+                let combinedDisplayString = finalExpiryDisplay; 
                 let isExpired = false;
 
                 if (expiryDate && !isNaN(expiryDate.getTime())) {
@@ -307,14 +335,16 @@
                     const diffInDays = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
 
                     if (diffInDays > 1) {
-                        combinedDisplayString = `${foundVoucher.expiryText} (${diffInDays} Days Remaining)`;
+                        combinedDisplayString = `${finalExpiryDisplay} (${diffInDays} Days Remaining)`;
                     } else if (diffInDays === 1) {
-                        combinedDisplayString = `${foundVoucher.expiryText} (1 Day Remaining)`;
+                        combinedDisplayString = `${finalExpiryDisplay} (1 Day Remaining)`;
                     } else if (diffInDays === 0 || (timeDiff > 0 && diffInDays <= 0)) {
-                        combinedDisplayString = `${foundVoucher.expiryText} (Expires Today)`;
+                        combinedDisplayString = `${finalExpiryDisplay} (Expires Today)`;
                     } else {
                         isExpired = true;
                     }
+                } else {
+                    isExpired = true; // Mark expired if timestamp is entirely missing or broken
                 }
 
                 if (isExpired) {
@@ -334,7 +364,7 @@
                     document.getElementById('dash-time').className = "text-base font-semibold text-rose-600";
                     
                     const speedBadge = document.getElementById('dash-speed');
-                    speedBadge.innerText = foundVoucher.speedTier;
+                    speedBadge.innerText = foundVoucher.speedTier ? foundVoucher.speedTier : 'HIGH';
                     speedBadge.className = "text-sm font-medium bg-gray-100 text-gray-400 px-3 py-1 rounded-md uppercase";
                     
                     document.getElementById('dash-code-display').innerText = foundVoucher.code;
@@ -342,7 +372,7 @@
                     return;
                 }
 
-                // RENDERING THE SUCCESS ACTIVE DASHBOARD VIEW
+                // SUCCESS DISPLAY PANEL
                 document.getElementById('status-icon-expired').classList.add('hidden');
                 document.getElementById('status-icon-active').classList.remove('hidden');
                 
@@ -357,7 +387,7 @@
                 document.getElementById('dash-time').className = "text-base font-semibold text-emerald-600";
                 
                 const speedBadge = document.getElementById('dash-speed');
-                speedBadge.innerText = foundVoucher.speedTier;
+                speedBadge.innerText = foundVoucher.speedTier ? foundVoucher.speedTier : 'HIGH';
                 speedBadge.className = "text-sm font-medium bg-blue-50 text-blue-600 px-3 py-1 rounded-md uppercase";
                 
                 document.getElementById('dash-code-display').innerText = foundVoucher.code;
