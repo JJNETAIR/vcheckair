@@ -33,10 +33,10 @@
     <header class="w-full py-10 px-8 flex justify-center items-center">
         <div class="flex items-center space-x-4">
             <div class="w-14 h-14 rounded-2xl bg-white/40 border border-white/60 backdrop-blur-md shadow-apple flex items-center justify-center">
-    <svg class="w-7 h-7 text-[#1D1D1F]/70" viewBox="0 0 170 170" fill="currentColor">
-        <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.34.13-9.13-1.92-14.38-6.15-3.61-2.94-7.49-7.79-11.65-14.54-7.85-12.77-13.2-26.6-16.03-41.48-2.83-14.88-2.01-28.52 2.45-40.91 4.43-12.22 11.3-21.7 20.62-28.44 9.33-6.73 19.75-10.22 31.28-10.46 6.15 0 12.89 1.62 20.21 4.88 7.32 3.24 11.65 4.88 12.98 4.88 1.15 0 5.66-1.7 13.56-5.07 7.9-3.39 14.47-4.85 19.72-4.39 14.54.99 25.86 6.43 33.95 16.32-13.25 8.07-19.72 19.12-19.41 33.14.31 10.87 4.25 19.86 11.82 26.94 7.57 7.12 16.59 10.98 27.06 11.59-2.26 6.74-5.3 13.6-9.12 20.57zM119.55 31.25c0-7.71 2.76-14.88 8.27-21.52 5.51-6.64 12.37-10.74 20.57-12.3 1.02 8.33-1.63 16.12-7.96 23.37-6.33 7.25-13.56 11.45-21.68 12.59-.44-1.42-.7-2.14-.7-2.14z"/>
-    </svg>
-</div>
+                <svg class="w-7 h-7 text-[#1D1D1F]/70" viewBox="0 0 170 170" fill="currentColor">
+                    <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.34.13-9.13-1.92-14.38-6.15-3.61-2.94-7.49-7.79-11.65-14.54-7.85-12.77-13.2-26.6-16.03-41.48-2.83-14.88-2.01-28.52 2.45-40.91 4.43-12.22 11.3-21.7 20.62-28.44 9.33-6.73 19.75-10.22 31.28-10.46 6.15 0 12.89 1.62 20.21 4.88 7.32 3.24 11.65 4.88 12.98 4.88 1.15 0 5.66-1.7 13.56-5.07 7.9-3.39 14.47-4.85 19.72-4.39 14.54.99 25.86 6.43 33.95 16.32-13.25 8.07-19.72 19.12-19.41 33.14.31 10.87 4.25 19.86 11.82 26.94 7.57 7.12 16.59 10.98 27.06 11.59-2.26 6.74-5.3 13.6-9.12 20.57zM119.55 31.25c0-7.71 2.76-14.88 8.27-21.52 5.51-6.64 12.37-10.74 20.57-12.3 1.02 8.33-1.63 16.12-7.96 23.37-6.33 7.25-13.56 11.45-21.68 12.59-.44-1.42-.7-2.14-.7-2.14z"/>
+                </svg>
+            </div>
             <span class="text-2xl font-semibold tracking-tight text-[#1D1D1F]">Apple Air</span>
         </div>
     </header>
@@ -76,6 +76,15 @@
                     <span id="dash-speed" class="text-sm font-medium px-3 py-1 rounded-md">--</span>
                 </div>
             </div>
+
+            <div id="notification-section" class="mt-4 hidden">
+                <button id="notify-me-btn" class="w-full py-3 px-4 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-600 font-medium flex items-center justify-center space-x-2 active:scale-95 transition-transform">
+                    <span>Notify Me 1 Day Before Expiry</span>
+                    <span>🔔</span>
+                </button>
+                <p id="notify-status" class="text-xs text-center mt-1.5 text-gray-400 hidden"></p>
+            </div>
+
             <button onclick="backToEntryView()" class="w-full py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-2xl">Check Another Voucher</button>
         </div>
 
@@ -86,8 +95,7 @@
     </main>
 
     <footer class="w-full py-6 text-center text-[11px] text-[#86868B]">&copy; 2026 Apple Air. All rights reserved.</footer>
-
-    <script>
+        <script>
         const BIN_ID = "6a0cacb36877513b279bbe63"; 
         const MASTER_KEY = "$2a$10$LS7aJr2QiV2RpptiyeBA9umWLUV9NV8nYaEVHT91YLShcgX1xNPbC"; 
 
@@ -111,6 +119,62 @@
                 return new Date(year, month, day);
             }
             return new Date(str);
+        }
+
+        // Handles the calculation and execution for the notification workflow
+        function handleVoucherNotification(rawExpiryText, voucherCode) {
+            const container = document.getElementById('notification-section');
+            const btn = document.getElementById('notify-me-btn');
+            const statusText = document.getElementById('notify-status');
+            
+            const expiryDate = parseSheetDateString(rawExpiryText);
+            if (!expiryDate || isNaN(expiryDate.getTime())) {
+                container.classList.add('hidden');
+                return;
+            }
+
+            container.classList.remove('hidden');
+
+            // Reset state defaults
+            btn.innerHTML = '<span>Notify Me 1 Day Before Expiry</span> <span>🔔</span>';
+            btn.className = "w-full py-3 px-4 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-600 font-medium flex items-center justify-center space-x-2 active:scale-95 transition-transform";
+            statusText.classList.add('hidden');
+
+            // Check if reminder was already saved in local storage for this code
+            if (localStorage.getItem(`alert_target_${voucherCode}`)) {
+                const targetedDate = localStorage.getItem(`alert_target_${voucherCode}`);
+                btn.innerHTML = '<span>Reminder Active</span> <span>✅</span>';
+                btn.className = "w-full py-3 px-4 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 font-medium flex items-center justify-center space-x-2 pointer-events-none";
+                statusText.innerText = `Alert arms on: ${targetedDate}`;
+                statusText.classList.remove('hidden');
+                return;
+            }
+
+            btn.onclick = async () => {
+                if (!('Notification' in window)) {
+                    alert('This browser does not support web notifications.');
+                    return;
+                }
+
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    const targetAlertDate = new Date(expiryDate);
+                    targetAlertDate.setDate(targetAlertDate.getDate() - 1);
+                    
+                    const alertString = targetAlertDate.toLocaleDateString('en-GB'); 
+                    
+                    localStorage.setItem(`alert_target_${voucherCode}`, alertString);
+                    localStorage.setItem(`alert_status_${voucherCode}`, 'pending');
+                    
+                    btn.innerHTML = '<span>Reminder Active</span> <span>✅</span>';
+                    btn.className = "w-full py-3 px-4 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 font-medium flex items-center justify-center space-x-2 pointer-events-none";
+                    
+                    statusText.innerText = `Alert arms on: ${alertString}`;
+                    statusText.classList.remove('hidden');
+                } else {
+                    alert('Please authorize notifications inside your hardware/browser options layout.');
+                }
+            };
         }
 
         async function streamLiveVerification() {
@@ -192,7 +256,8 @@
 
                 if (isExpired) {
                     alert("Voucher not valid/Expired  ⚠️");
-                    
+                    document.getElementById('notification-section').classList.add('hidden');
+
                     const expiredIcon = document.getElementById('status-icon-expired');
                     const titleText = document.getElementById('dash-status-title');
                     
@@ -237,6 +302,10 @@
                 speedBadge.className = "text-sm font-medium bg-blue-50 text-blue-600 px-3 py-1 rounded-md uppercase";
                 
                 document.getElementById('dash-code-display').innerText = foundVoucher.code;
+                
+                // Fire notification engine calculations
+                handleVoucherNotification(foundVoucher.expiryText, foundVoucher.code);
+
                 renderView('view-dashboard');
 
             } catch (err) {
