@@ -114,11 +114,11 @@ async function streamLiveVerification() {
 
         let delimiter = rows[0].includes(';') ? ';' : ',';
 
-        // Direct Layout Indexes: Column A=0, B=1, C=2, D=3
-        let codeIdx = 0;
-        let startTimeIdx = 1;
-        let durationIdx = 2;
-        let expirationIdx = 3;
+        // 🎯 FORCE POSITIONAL INDEX LOOKUP (No matter what text formatting is used)
+        let codeIdx = 0;         // Column A
+        let startTimeIdx = 1;    // Column B
+        let durationIdx = 2;     // Column C
+        let expirationIdx = 3;   // Column D
 
         let matchedRowFields = null;
 
@@ -146,19 +146,19 @@ async function streamLiveVerification() {
         const gridContainer = document.getElementById('festa-data-container');
         gridContainer.innerHTML = ''; 
 
-        // Extract raw data values
+        // Extract values strictly by row index position
         let voucherCodeDisplay = (matchedRowFields[codeIdx] || userInput).toUpperCase();
         let startTimeVal = matchedRowFields[startTimeIdx] || 'Not Activated Yet';
         let durationVal = matchedRowFields[durationIdx] || '--';
         let expirationVal = matchedRowFields[expirationIdx] || 'No Limit';
 
-        // Clean out any raw hidden line breaks completely
+        // Clean values of hidden double breaks or quotes
         voucherCodeDisplay = voucherCodeDisplay.replace(/[\r\n]+/g, ' ').trim();
         startTimeVal = startTimeVal.replace(/[\r\n]+/g, ' ').trim();
         durationVal = durationVal.replace(/[\r\n]+/g, ' ').trim();
         expirationVal = expirationVal.replace(/[\r\n]+/g, ' ').trim();
 
-        // Check validation calculations on Expiration Time (Column D)
+        // Check active validation calculations on the raw text data inside column D
         let isExpired = false;
         let validityBadgeText = expirationVal;
         
@@ -175,7 +175,7 @@ async function streamLiveVerification() {
             }
         }
 
-        // 🍎 Clean UI Breakdown - Displaying Column B and Column D perfectly separated
+        // 🍎 Separate Display Layout Rows Output
         gridContainer.innerHTML += createDisplayRow("Voucher Code", voucherCodeDisplay, false);
         gridContainer.innerHTML += createDisplayRow("Start Time", startTimeVal, false);
         gridContainer.innerHTML += createDisplayRow("Plan Duration", durationVal, false);
