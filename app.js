@@ -114,11 +114,7 @@ async function streamLiveVerification() {
 
         let delimiter = rows[0].includes(';') ? ';' : ',';
 
-        // Direct Column Mapping Positions based on your sheet layout:
-        // Column A = 0 (Voucher Code)
-        // Column B = 1 (Start Time)
-        // Column C = 2 (Duration)
-        // Column D = 3 (Expiration Time)
+        // Direct Layout Indexes: Column A=0, B=1, C=2, D=3
         let codeIdx = 0;
         let startTimeIdx = 1;
         let durationIdx = 2;
@@ -150,20 +146,22 @@ async function streamLiveVerification() {
         const gridContainer = document.getElementById('festa-data-container');
         gridContainer.innerHTML = ''; 
 
-        // Extract raw data fields safely
+        // Extract raw data values
         let voucherCodeDisplay = (matchedRowFields[codeIdx] || userInput).toUpperCase();
         let startTimeVal = matchedRowFields[startTimeIdx] || 'Not Activated Yet';
         let durationVal = matchedRowFields[durationIdx] || '--';
         let expirationVal = matchedRowFields[expirationIdx] || 'No Limit';
 
-        // Clean any linebreaks
+        // Clean out any raw hidden line breaks completely
         voucherCodeDisplay = voucherCodeDisplay.replace(/[\r\n]+/g, ' ').trim();
         startTimeVal = startTimeVal.replace(/[\r\n]+/g, ' ').trim();
         durationVal = durationVal.replace(/[\r\n]+/g, ' ').trim();
         expirationVal = expirationVal.replace(/[\r\n]+/g, ' ').trim();
 
-        // Check if voucher has expired based on Column D (Expiration Time)
+        // Check validation calculations on Expiration Time (Column D)
         let isExpired = false;
+        let validityBadgeText = expirationVal;
+        
         const expiryDate = parseSheetDateString(expirationVal);
         if (expiryDate && !isNaN(expiryDate.getTime())) {
             const today = new Date();
@@ -171,17 +169,17 @@ async function streamLiveVerification() {
                 isExpired = true;
             } else {
                 const diffDays = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                if (diffDays > 1) expirationVal += ` (${diffDays} Days Left)`;
-                else if (diffDays === 1) expirationVal += ` (1 Day Left)`;
-                else expirationVal += ` (Expires Today)`;
+                if (diffDays > 1) validityBadgeText = `${expirationVal} (${diffDays} Days Left)`;
+                else if (diffDays === 1) validityBadgeText = `${expirationVal} (1 Day Left)`;
+                else validityBadgeText = `${expirationVal} (Expires Today)`;
             }
         }
 
-        // 🍎 Render exactly what you asked for onto the user dashboard card
+        // 🍎 Clean UI Breakdown - Displaying Column B and Column D perfectly separated
         gridContainer.innerHTML += createDisplayRow("Voucher Code", voucherCodeDisplay, false);
         gridContainer.innerHTML += createDisplayRow("Start Time", startTimeVal, false);
         gridContainer.innerHTML += createDisplayRow("Plan Duration", durationVal, false);
-        gridContainer.innerHTML += createDisplayRow("Expiration Time", isExpired ? "Expired" : expirationVal, !isExpired);
+        gridContainer.innerHTML += createDisplayRow("Expiration Time", isExpired ? "Expired" : validityBadgeText, !isExpired);
 
         document.getElementById('dash-code-display').innerText = voucherCodeDisplay;
 
