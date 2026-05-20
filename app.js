@@ -92,8 +92,88 @@ function fetchVoucherStatusFromServer(voucherCode) {
         document.getElementById('dash-data').innerText = matchedVoucher.dataAllowance;
         document.getElementById('dash-speed').innerText = matchedVoucher.speedTier;
         
+        // Fire notification control setup dynamically
+        setupNotification(matchedVoucher.timeRemaining, matchedVoucher.code);
+        
         renderView('view-dashboard');
     }, MOCK_API_DELAY);
+}
+
+// 🔔 PERSISTENT DEVICE NOTIFICATION CONTROLLER (SCOPED BY VOUCHER)
+function setupNotification(expiryDateString, voucherCode) {
+    const notifySection = document.getElementById('notification-section');
+    const notifyBtn = document.getElementById('notify-me-btn');
+    const notifyStatus = document.getElementById('notify-status');
+    
+    if (!notifySection || !notifyBtn || !notifyStatus) return;
+
+    // Create unique keys tied explicitly to this individual voucher code
+    const storageKeyDate = `alert_date_${voucherCode.toLowerCase()}`;
+    const storageKeyStatus = `alert_status_${voucherCode.toLowerCase()}`;
+
+    // Show the wrapper panel layout
+    notifySection.classList.remove('hidden');
+
+    // STATE CHECK: If this exact voucher already possesses a saved reminder, render success state immediately
+    if (localStorage.getItem(storageKeyDate)) {
+        const existingAlertString = localStorage.getItem(storageKeyDate);
+        notifyBtn.innerHTML = '<span>Reminder Scheduled!</span> <span>✅</span>';
+        notifyBtn.className = "w-full py-3 px-4 rounded-xl bg-green-50/80 border border-green-200 text-green-600 font-medium flex items-center justify-center space-x-2 pointer-events-none";
+        
+        notifyStatus.innerText = `We will alert you on ${existingAlertString}`;
+        notifyStatus.classList.remove('hidden');
+        return; 
+    }
+
+    // Reset button layouts to regular blue accent state if it's a completely un-armed voucher
+    notifyBtn.innerHTML = '<span>Notify Me 1 Day Before Expiry</span> <span>🔔</span>';
+    notifyBtn.className = "w-full py-3 px-4 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-600 font-medium flex items-center justify-center space-x-2 active:scale-95 transition-transform";
+    notifyStatus.classList.add('hidden');
+
+    notifyBtn.onclick = async () => {
+        if (!('Notification' in window)) {
+            alert('This device or browser profile does not support web pushes.');
+            return;
+        }
+
+        const permission = await Notification.requestPermission();
+        
+        if (permission === 'granted') {
+            // Parse expiry date (Assuming DD/MM/YYYY format out of Google Sheets extraction)
+            const parts = expiryDateString.split('/');
+            let expiryDate;
+            
+            if (parts.length === 3) {
+                expiryDate = new Date(parts[2], parts[1] - 1, parts[0]);
+            } else {
+                expiryDate = new Date(expiryDateString);
+            }
+
+            if (isNaN(expiryDate.getTime())) {
+                notifySection.classList.add('hidden');
+                return;
+            }
+            
+            // Subtract 1 day to find the target alert date execution window
+            const alertDate = new Date(expiryDate);
+            alertDate.setDate(alertDate.getDate() - 1);
+            
+            const alertString = alertDate.toLocaleDateString('en-GB'); // DD/MM/YYYY
+            
+            // Save settings locally to device storage
+            localStorage.setItem(storageKeyDate, alertString);
+            localStorage.setItem(storageKeyStatus, 'pending');
+            
+            // Visual dynamic structural transformation
+            notifyBtn.innerHTML = '<span>Reminder Scheduled!</span> <span>✅</span>';
+            notifyBtn.className = "w-full py-3 px-4 rounded-xl bg-green-50/80 border border-green-200 text-green-600 font-medium flex items-center justify-center space-x-2 pointer-events-none";
+            
+            notifyStatus.innerText = `We will alert you on ${alertString}`;
+            notifyStatus.classList.remove('hidden');
+        } else {
+            alert("Please enable notification permissions in your browser settings to use this feature.");
+        }
+    };
 }
 
 function disconnectActiveVoucherSession() {
@@ -101,6 +181,11 @@ function disconnectActiveVoucherSession() {
     currentState.activeVoucher = null;
     currentState.dashboardData = null;
     document.getElementById('voucher-input').value = '';
+    
+    // Hide notification section on dashboard log out
+    const notifySection = document.getElementById('notification-section');
+    if (notifySection) notifySection.classList.add('hidden');
+
     renderView('view-entry');
 }
 
