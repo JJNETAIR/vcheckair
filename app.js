@@ -1,6 +1,6 @@
 /**
- * Apple Air - Definitive User Portal Verification Engine
- * Core Structure: A: code | B: start time | C: status | D: Expirationtime
+ * Apple Air - High Performance Realtime Sync Database Core
+ * Structural Matrix Rules: A: code | B: start time | C: status | D: Expirationtime
  */
 
 const BIN_ID = "6a0cacb36877513b279bbe63"; 
@@ -13,7 +13,7 @@ function renderView(viewId) {
     });
 }
 
-// Clean CSV column parser supporting text qualifiers perfectly
+// Custom split parser handling internal column commas safely
 function parseCSVLine(text, delimiter) {
     if (!text) return [];
     let columns = [];
@@ -35,8 +35,7 @@ function parseCSVLine(text, delimiter) {
     return columns.map(col => col.replace(/^["']|["']$/g, '').trim());
 }
 
-// Expose the function globally so the HTML button's onclick handler can see it instantly
-window.streamLiveVerification = async function() {
+async function streamLiveVerification() {
     const inputEl = document.getElementById('voucher-input');
     const userInput = inputEl.value.trim().toLowerCase();
     if (!userInput) return alert('Please enter your voucher code.');
@@ -44,24 +43,24 @@ window.streamLiveVerification = async function() {
     renderView('view-loading');
 
     try {
-        // 1. Fetch Cloud Config
+        // 1. Fetch Cloud Link from JSONBin configuration
         const cloudResponse = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
             headers: { "X-Master-Key": MASTER_KEY }
         });
         const cloudData = await cloudResponse.json();
         const activeUrl = cloudData.record.url;
         
-        // 2. Extract Core Sheet ID cleanly using a precise matching template
+        // 2. Strict Core Sheet ID Regex Extractor
         const idMatch = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
         if (!idMatch || !idMatch[1]) {
             throw new Error("Stored URL is missing a valid Google Spreadsheet ID.");
         }
         const spreadsheetId = idMatch[1];
         
-        // 3. Build perfect download link query string structure directly
+        // 3. Construct a completely clean export address line
         const exportUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&cache_bypass=${Date.now()}`;
         
-        // 4. Download file data records array matrix payload
+        // 4. Download Stream payload mapping
         const response = await fetch(exportUrl);
         if (!response.ok) throw new Error(`Google rejected data sync request: ${response.status}`);
         
@@ -87,39 +86,39 @@ window.streamLiveVerification = async function() {
 
         const values = parseCSVLine(matchedRow, delimiter);
         
-        // 6. Extract Column Values precisely based on your current A, B, C, D setup
-        const voucherCode = (values[0] || userInput).toUpperCase();
-        const startTime   = (values[1] && values[1].trim() !== "") ? values[1].trim() : "-";
-        const status      = (values[2] && values[2].trim() !== "") ? values[2].trim() : "-";
-        const expiration  = (values[3] && values[3].trim() !== "") ? values[3].trim() : "-";
+        // Set dynamic master uppercase identifier title block
+        document.getElementById('dash-code-display').innerText = (values[0] || userInput).toUpperCase();
 
-        // 7. Inject values directly into your exact HTML components elements slots
-        
-        // Slot 1: Title Header display text
-        const codeDisplayElement = document.getElementById('dash-code-display');
-        if (codeDisplayElement) {
-            codeDisplayElement.innerText = voucherCode;
+        // Extract column strings array indexes safely avoiding layout overflows
+        const startTime  = (values[1] && values[1].trim() !== "") ? values[1].trim() : "-";
+        const status     = (values[2] && values[2].trim() !== "") ? values[2].trim() : "-";
+        const expiration = (values[3] && values[3].trim() !== "") ? values[3].trim() : "-";
+
+        // Dynamic status layout color logic rules
+        let statusColors = "bg-[#F5F5F7] text-gray-900";
+        if (status.toLowerCase().includes('act') || status.toLowerCase().includes('live')) {
+            statusColors = "bg-emerald-50 text-emerald-700 border border-emerald-100/70";
+        } else {
+            statusColors = "bg-amber-50 text-amber-800 border border-amber-100/70";
         }
 
-        // Slot 2: Map Status into the 'dash-data' text component field block
-        const dataElement = document.getElementById('dash-data');
-        if (dataElement) {
-            dataElement.innerText = status.toUpperCase();
-            // Color code the status text based on active vs inactive profiles
-            if (status.toLowerCase().includes('act') || status.toLowerCase().includes('live')) {
-                dataElement.className = "text-base font-bold text-emerald-600 tracking-wide";
-            } else {
-                dataElement.className = "text-base font-bold text-amber-500 tracking-wide";
-            }
-        }
-
-        // Slot 3: Map Start and Expiration Times into the 'dash-time' block layout text area
-        const timeElement = document.getElementById('dash-time');
-        if (timeElement) {
-            timeElement.innerHTML = `
-                <div class="text-left space-y-1 mt-1 text-xs font-medium text-gray-500">
-                    <div><span class="font-bold text-gray-800 text-[10px] uppercase tracking-wider block">Started:</span> ${startTime}</div>
-                    <div class="pt-1"><span class="font-bold text-rose-600 text-[10px] uppercase tracking-wider block">Expires:</span> ${expiration}</div>
+        // 6. Paint the dashboard grid view directly
+        const container = document.getElementById('festa-data-container');
+        if (container) {
+            container.innerHTML = `
+                <div class="p-4 rounded-2xl flex flex-col justify-center space-y-1 bg-blue-50 text-blue-700 border border-blue-100/70">
+                    <span class="text-[10px] font-bold uppercase tracking-wider opacity-60">Start Time</span>
+                    <span class="text-base font-bold tracking-tight">${startTime}</span>
+                </div>
+                
+                <div class="p-4 rounded-2xl flex flex-col justify-center space-y-1 ${statusColors}">
+                    <span class="text-[10px] font-bold uppercase tracking-wider opacity-60">Status</span>
+                    <span class="text-base font-bold tracking-tight">${status}</span>
+                </div>
+                
+                <div class="p-4 rounded-2xl flex flex-col justify-center space-y-1 bg-rose-50 text-rose-700 border border-rose-100/70">
+                    <span class="text-[10px] font-bold uppercase tracking-wider opacity-60">Expiration Time</span>
+                    <span class="text-base font-bold tracking-tight">${expiration}</span>
                 </div>
             `;
         }
@@ -132,14 +131,26 @@ window.streamLiveVerification = async function() {
     }
 }
 
+// Bind native click actions cleanly when the DOM content finishes loading
 document.addEventListener('DOMContentLoaded', () => {
     renderView('view-entry');
     
-    // Setup clean event fallback hooks directly on inputs
+    const checkBtn = document.getElementById('check-btn');
+    const backBtn = document.getElementById('back-btn');
+    
+    if (checkBtn) checkBtn.addEventListener('click', streamLiveVerification);
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            const inputEl = document.getElementById('voucher-input');
+            if (inputEl) inputEl.value = '';
+            renderView('view-entry');
+        });
+    }
+    
     const inputEl = document.getElementById('voucher-input');
     if (inputEl) {
         inputEl.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') window.streamLiveVerification();
+            if (e.key === 'Enter') streamLiveVerification();
         });
     }
 });
