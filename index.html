@@ -285,33 +285,58 @@
                 const response = await fetch(csvEndpoint);
                 const csvText = await response.text();
 
-                const rows = csvText.split(/\r?\n/);
-                let delimiter = rows[0].includes(';') ? ';' : ',';
-                
-                // FIXED: Use positional columns - most reliable since sheet layout is always known
-                // Sheet: A(0)=code, B(1)=starttime, C(2)=status, D(3)=Expirationtime
-                // Header-name matching fails when Google Sheets wraps headers with newlines in CSV export
-                const colCode   = 0;
-                const colStart  = 1;
-                const colStatus = 2;
-                const colExpiry = 3;
+                // PROPER FULL-CSV PARSER: handles multiline quoted fields correctly
+                // Google Sheets wraps fields containing newlines in double-quotes e.g.:
+                // "Jun 16, 2026 11:16:37\nam"  — splitting on \n first destroys these
+                function parseFullCSV(text) {
+                    const records = [];
+                    let row = [];
+                    let field = '';
+                    let inQuotes = false;
+                    for (let i = 0; i < text.length; i++) {
+                        const ch = text[i];
+                        const next = text[i + 1];
+                        if (inQuotes) {
+                            if (ch === '"' && next === '"') { field += '"'; i++; }       // escaped quote
+                            else if (ch === '"') { inQuotes = false; }                   // end of quoted field
+                            else { field += ch; }                                        // content inside quotes (incl. newlines)
+                        } else {
+                            if (ch === '"') { inQuotes = true; }                         // start quoted field
+                            else if (ch === ',') { row.push(field.trim()); field = ''; } // next column
+                            else if (ch === '\n' || (ch === '\r' && next === '\n')) { // end of row
+                                row.push(field.trim());
+                                if (row.some(c => c !== '')) records.push(row);
+                                row = []; field = '';
+                                if (ch === '\r') i++;
+                            } else { field += ch; }
+                        }
+                    }
+                    if (field || row.length) { row.push(field.trim()); if (row.some(c => c !== '')) records.push(row); }
+                    return records;
+                }
+
+                const allRows = parseFullCSV(csvText);
+                if (allRows.length < 2) throw new Error('Empty sheet');
+
+                // Fixed positional columns: A=0 code, B=1 starttime, C=2 status, D=3 Expirationtime
+                const colCode=0, colStart=1, colStatus=2, colExpiry=3;
 
                 let foundVoucher = null;
 
-                for (let i = 1; i < rows.length; i++) {
-                    if (!rows[i].trim()) continue;
-                    const columns = parseCSVLine(rows[i], delimiter);
+                for (let i = 1; i < allRows.length; i++) {
+                    const columns = allRows[i];
                     if (!columns[colCode]) continue;
 
-                    // ✅ FIXED: Strip "Voucher - " prefix before matching so user just types the number
+                    // Strip "Voucher - " prefix so user just types the number
                     let cleanedSheetCode = columns[colCode].replace(/Voucher\s*-\s*/i, '').trim();
 
                     if (cleanedSheetCode.toLowerCase() === userInput) {
+                        const clean = s => (s || '').replace(/[\r\n]+/g, ' ').replace(/"+/g, '').trim();
                         foundVoucher = {
-                            code: cleanedSheetCode.toUpperCase(),
-                            startTime: (columns[colStart] || '').replace(/[\r\n]+/g, ' ').replace(/["']/g, '').trim(),
-                            status: (columns[colStatus] || '').replace(/[\r\n\t"']+/g, '').trim().toLowerCase(),
-                            expiryText: (columns[colExpiry] || '').replace(/[\r\n]+/g, ' ').replace(/["']/g, '').trim()
+                            code:       cleanedSheetCode.toUpperCase(),
+                            startTime:  clean(columns[colStart]),
+                            status:     clean(columns[colStatus]).toLowerCase(),
+                            expiryText: clean(columns[colExpiry])
                         };
                         break;
                     }
