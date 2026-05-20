@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Apple Air - Voucher Portal</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Apple Air">
+    
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="167x167" href="icons/icon-192.png">
+    
+    <link rel="manifest" href="manifest.json">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', 'sans-serif'] },
+                    boxShadow: { 'apple': '0 4px 30px rgba(0, 0, 0, 0.03)', 'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.06)' }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-[#F5F5F7] text-[#1D1D1F] min-h-screen flex flex-col justify-between">
+    
+    <header class="w-full py-10 px-8 flex justify-center items-center">
+        <div class="flex items-center space-x-4">
+            <div class="w-14 h-14 rounded-2xl bg-white/40 border border-white/60 backdrop-blur-md shadow-apple flex items-center justify-center">
+                <svg class="w-7 h-7 text-[#1D1D1F]/70" viewBox="0 0 170 170" fill="currentColor">
+                    <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.34.13-9.13-1.92-14.38-6.15-3.61-2.94-7.49-7.79-11.65-14.54-7.85-12.77-13.2-26.6-16.03-41.48-2.83-14.88-2.01-28.52 2.45-40.91 4.43-12.22 11.3-21.7 20.62-28.44 9.33-6.73 19.75-10.22 31.28-10.46 6.15 0 12.89 1.62 20.21 4.88 7.32 3.24 11.65 4.88 12.98 4.88 1.15 0 5.66-1.7 13.56-5.07 7.9-3.39 14.47-4.85 19.72-4.39 14.54.99 25.86 6.43 33.95 16.32-13.25 8.07-19.72 19.12-19.41 33.14.31 10.87 4.25 19.86 11.82 26.94 7.57 7.12 16.59 10.98 27.06 11.59-2.26 6.74-5.3 13.6-9.12 20.57zM119.55 31.25c0-7.71 2.76-14.88 8.27-21.52 5.51-6.64 12.37-10.74 20.57-12.3 1.02 8.33-1.63 16.12-7.96 23.37-6.33 7.25-13.56 11.45-21.68 12.59-.44-1.42-.7-2.14-.7-2.14z"/>
+                </svg>
+            </div>
+            <span class="text-2xl font-semibold tracking-tight text-[#1D1D1F]">Apple Air</span>
+        </div>
+    </header>
+
+    <main class="w-full max-w-md mx-auto px-6 flex-grow flex flex-col justify-center items-center">
+        <div id="view-entry" class="w-full bg-white/70 border border-white/60 backdrop-blur-xl rounded-3xl p-8 shadow-glass space-y-8">
+            <div class="text-center space-y-2">
+                <h1 class="text-2xl font-semibold tracking-tight">Internet Voucher</h1>
+                <p class="text-sm text-[#86868B]">Enter your access code to view connection data and validity.</p>
+            </div>
+            <div class="space-y-4">
+                <input type="text" id="voucher-input" placeholder="e.g. 123456" autocomplete="off" class="w-full px-5 py-4 bg-white/50 border border-gray-200 rounded-2xl text-base font-medium text-center uppercase focus:outline-none focus:border-blue-500 focus:bg-white shadow-inner">
+                <button onclick="streamLiveVerification()" class="w-full py-4 bg-[#0071E3] hover:bg-[#0077ED] text-white font-medium rounded-2xl shadow-md">Check Validity</button>
+            </div>
+        </div>
+
+        <div id="view-dashboard" class="w-full bg-white/70 border border-white/60 backdrop-blur-xl rounded-3xl p-8 shadow-glass space-y-6 hidden transform translate-y-4 opacity-0 transition-all duration-300">
+            <div class="flex flex-col items-center text-center space-y-2">
+                <div id="status-icon-active" class="hidden w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-500 text-xl font-bold">✓</div>
+                <div id="status-icon-expired" class="hidden w-12 h-12 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-500 text-xl font-bold">✕</div>
+                
+                <h2 id="dash-status-title" class="text-xl font-semibold tracking-tight">Voucher Status</h2>
+                <p id="dash-code-display" class="text-xs font-mono bg-gray-100 text-gray-600 px-3 py-1 rounded-full uppercase tracking-wider">CODE</p>
+            </div>
+
+            <div class="bg-white/50 border border-gray-100 rounded-2xl overflow-hidden divide-y divide-gray-100 shadow-inner">
+                <div class="flex justify-between items-center px-5 py-4">
+                    <span class="text-sm font-medium text-[#86868B]">Status</span>
+                    <span id="dash-status-badge" class="text-sm font-semibold px-3 py-1 rounded-full bg-gray-100 text-gray-500">--</span>
+                </div>
+                <div class="flex justify-between items-center px-5 py-4">
+                    <span class="text-sm font-medium text-[#86868B]">Start Time</span>
+                    <span id="dash-time" class="text-sm font-semibold text-right max-w-[200px] leading-tight text-gray-900">--</span>
+                </div>
+                <div class="flex justify-between items-center px-5 py-4">
+                    <span class="text-sm font-medium text-[#86868B]">Expiration Time</span>
+                    <span id="dash-data" class="text-sm font-semibold text-right max-w-[200px] leading-tight text-gray-900">--</span>
+                </div>
+                <div class="flex justify-between items-center px-5 py-4">
+                    <span class="text-sm font-medium text-[#86868B]">Days Remaining</span>
+                    <span id="dash-speed" class="text-sm font-medium px-3 py-1 rounded-md">--</span>
+                </div>
+            </div>
+
+            <div id="notification-section" class="mt-4 hidden">
+                <button id="notify-me-btn" class="w-full py-3 px-4 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-600 font-medium flex items-center justify-center space-x-2 active:scale-95 transition-transform">
+                    <span>Notify Me 1 Day Before Expiry</span>
+                    <span>🔔</span>
+                </button>
+                <p id="notify-status" class="text-xs text-center mt-1.5 text-gray-400 hidden"></p>
+            </div>
+
+            <button onclick="backToEntryView()" class="w-full py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-2xl">Check Another Voucher</button>
+        </div>
+
+        <div id="view-loading" class="hidden flex flex-col items-center space-y-4">
+            <div class="w-8 h-8 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin"></div>
+            <p class="text-xs font-medium text-[#86868B]">Streaming data from cloud network sync...</p>
+        </div>
+    </main>
+
+    <footer class="w-full py-6 text-center text-[11px] text-[#86868B]">&copy; 2026 Apple Air. All rights reserved.</footer>
+        <script>
+        const BIN_ID = "6a0cacb36877513b279bbe63"; 
+        const MASTER_KEY = "$2a$10$LS7aJr2QiV2RpptiyeBA9umWLUV9NV8nYaEVHT91YLShcgX1xNPbC"; 
+
+        function renderView(viewId) {
+            ['view-entry', 'view-dashboard', 'view-loading'].forEach(v => {
+                const el = document.getElementById(v);
+                if (!el) return;
+                if (v === viewId) {
+                    el.classList.remove('hidden');
+                    setTimeout(() => el.classList.remove('opacity-0', 'translate-y-4'), 20);
+                } else { el.classList.add('hidden', 'opacity-0', 'translate-y-4'); }
+            });
+        }
+
+        // 🛡️ DOUBLE-QUOTE SAFE CSV FIELD PARSER
+        function parseCSVLine(text, delimiter) {
+            let columns = [];
+            let insideQuotes = false;
+            let currentColumn = '';
+            
+            for (let i = 0; i < text.length; i++) {
+                let char = text[i];
+                if (char === '"') {
+                    insideQuotes = !insideQuotes;
+                } else if (char === delimiter && !insideQuotes) {
+                    columns.push(currentColumn.trim());
+                    currentColumn = '';
+                } else {
+                    currentColumn += char;
+                }
+            }
+            columns.push(currentColumn.trim());
+            // Clean external quotes from fields cleanly
+            return columns.map(col => col.replace(/^["']|["']$/g, '').trim());
+        }
+
+        // 📅 ROBUST DATE PARSER (Clears newlines and formats explicitly)
+        function parseSheetDateString(str) {
+            if (!str) return null;
+            
+            // Strip any cellular text wrapping line breaks cleanly
+            let sanitized = str.replace(/[\r\n]+/g, ' ').trim();
+            
+            // Handle regular clean text segments
+            let clean = sanitized.replace(/[^a-zA-Z0-9\s:]/g, ' ').replace(/\s+/g, ' ').trim();
+            let segments = clean.split(' ');
+            
+            if (segments.length < 3) return null;
+
+            const months = {
+                jan:0, feb:1, mar:2, apr:3, may:4, jun:5,
+                jul:6, aug:7, sep:8, oct:9, nov:10, dec:11
+            };
+
+            let monthStr = segments[0].toLowerCase().substring(0, 3);
+            let month = months[monthStr];
+            let day = parseInt(segments[1], 10);
+            let year = parseInt(segments[2], 10);
+
+            if (isNaN(month) || isNaN(day) || isNaN(year)) {
+                const backupParts = sanitized.split('/');
+                if (backupParts.length === 3) {
+                    return new Date(parseInt(backupParts[2],10), parseInt(backupParts[1],10)-1, parseInt(backupParts[0],10));
+                }
+                return null;
+            }
+
+            let hours = 0, minutes = 0, seconds = 0;
+            let timeMatch = clean.match(/(\d{2}):(\d{2}):(\d{2})/);
+            
+            if (timeMatch) {
+                hours = parseInt(timeMatch[1], 10);
+                minutes = parseInt(timeMatch[2], 10);
+                seconds = parseInt(timeMatch[3], 10);
+            }
+
+            if (/pm/i.test(sanitized) && hours < 12) hours += 12;
+            if (/am/i.test(sanitized) && hours === 12) hours = 0;
+
+            return new Date(year, month, day, hours, minutes, seconds);
+        }
+
+        // 🔔 REMINDER STORAGE MODULE
+        function setupNotification(expiryDateString, voucherCode) {
+            const notifySection = document.getElementById('notification-section');
+            const notifyBtn = document.getElementById('notify-me-btn');
+            const notifyStatus = document.getElementById('notify-status');
+            
+            if (!notifySection || !notifyBtn || !notifyStatus) return;
+
+            const storageKeyDate = `alert_date_${voucherCode.toLowerCase()}`;
+            const storageKeyStatus = `alert_status_${voucherCode.toLowerCase()}`;
+
+            notifySection.classList.remove('hidden');
+
+            const dbRequest = indexedDB.open('AppleAirDB', 1);
+            dbRequest.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('alerts')) db.createObjectStore('alerts');
+            };
+
+            dbRequest.onsuccess = (e) => {
+                const db = e.target.result;
+                const transaction = db.transaction('alerts', 'readonly');
+                const store = transaction.objectStore('alerts');
+                const getReq = store.get(storageKeyDate);
+
+                getReq.onsuccess = () => {
+                    if (getReq.result) {
+                        notifyBtn.innerHTML = '<span>Reminder Scheduled!</span> <span>✅</span>';
+                        notifyBtn.className = "w-full py-3 px-4 rounded-xl bg-green-50/80 border border-green-200 text-green-600 font-medium flex items-center justify-center space-x-2 pointer-events-none";
+                        notifyStatus.innerText = `We will alert you on ${getReq.result}`;
+                        notifyStatus.classList.remove('hidden');
+                    } else {
+                        notifyBtn.innerHTML = '<span>Notify Me 1 Day Before Expiry</span> <span>🔔</span>';
+                        notifyBtn.className = "w-full py-3 px-4 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-600 font-medium flex items-center justify-center space-x-2 active:scale-95 transition-transform";
+                        notifyStatus.classList.add('hidden');
+                    }
+                };
+            };
+
+            notifyBtn.onclick = async () => {
+                if (!('Notification' in window)) {
+                    alert('This browser does not support notifications.');
+                    return;
+                }
+
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    const expiryDate = parseSheetDateString(expiryDateString);
+                    if (!expiryDate) {
+                        alert('Could not parse expiry date.');
+                        return;
+                    }
+
+                    const alertDate = new Date(expiryDate);
+                    alertDate.setDate(alertDate.getDate() - 1);
+                    const alertString = alertDate.toLocaleDateString('en-GB'); 
+
+                    const dbReq = indexedDB.open('AppleAirDB', 1);
+                    dbReq.onsuccess = (event) => {
+                        const db = event.target.result;
+                        const tx = db.transaction('alerts', 'readwrite');
+                        const store = tx.objectStore('alerts');
+                        store.put(alertString, storageKeyDate);
+                        store.put('pending', storageKeyStatus);
+
+                        tx.oncomplete = () => {
+                            notifyBtn.innerHTML = '<span>Reminder Scheduled!</span> <span>✅</span>';
+                            notifyBtn.className = "w-full py-3 px-4 rounded-xl bg-green-50/80 border border-green-200 text-green-600 font-medium flex items-center justify-center space-x-2 pointer-events-none";
+                            notifyStatus.innerText = `We will alert you on ${alertString}`;
+                            notifyStatus.classList.remove('hidden');
+                        };
+                    };
+                } else {
+                    alert("Notification permission denied.");
+                }
+            };
+        }
+
+        // ⚡ LIVE CORRELATION STREAM (With Bulletproof Header Matching)
+        async function streamLiveVerification() {
+            const userInput = document.getElementById('voucher-input').value.trim().toLowerCase();
+            if (!userInput) return alert('Please enter a voucher code.');
+
+            renderView('view-loading');
+
+            try {
+                const cloudResponse = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    headers: { "X-Master-Key": MASTER_KEY }
+                });
+                const cloudData = await cloudResponse.json();
+                const activeUrl = cloudData.record.url;
+
+                if (!activeUrl) throw new Error("Invalid redirect target link.");
+
+                const match = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+                if (!match) throw new Error("Malformed URL hash parameters.");
+                
+                const spreadsheetId = match[1];
+                const csvEndpoint = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=0&cache_bypass=${Date.now()}`;
+
+                const response = await fetch(csvEndpoint);
+                const csvText = await response.text();
+
+                const rows = csvText.split(/\r?\n/);
+                let delimiter = rows[0].includes(';') ? ';' : ',';
+                
+                // ✅ FIXED: Strip headers to pure alphanumeric for reliable matching
+                const rawHeaders = parseCSVLine(rows[0], delimiter);
+                const headers = rawHeaders.map(h => h.toLowerCase().replace(/[^a-z0-9]/g, '').trim());
+
+                // ✅ FIXED: Map actual Google Sheet columns: code, starttime, status, Expirationtime
+                // BUG WAS: timeColumnIndex matched 'starttime' (col B) instead of 'expirationtime' (col D)
+                // FIX: Prefer 'expiration' match first, only fall back to plain 'time' if nothing else found
+                const codeColumnIndex = headers.findIndex(h => h === 'code' || h.includes('code') || h.includes('voucher'));
+                const startTimeColumnIndex = headers.findIndex(h => h === 'starttime' || (h.includes('start') && h.includes('time')));
+                const statusColumnIndex = headers.findIndex(h => h === 'status');
+                const expiryColumnIndex = headers.findIndex(h => h.includes('expiration') || h.includes('expiry') || (h.includes('expir') && h.includes('time')));
+
+                // Fallback to positional columns if headers are unrecognised (col A=0, B=1, C=2, D=3)
+                const colCode   = codeColumnIndex   !== -1 ? codeColumnIndex   : 0;
+                const colStart  = startTimeColumnIndex !== -1 ? startTimeColumnIndex : 1;
+                const colStatus = statusColumnIndex  !== -1 ? statusColumnIndex  : 2;
+                const colExpiry = expiryColumnIndex  !== -1 ? expiryColumnIndex  : 3;
+
+                let foundVoucher = null;
+
+                for (let i = 1; i < rows.length; i++) {
+                    if (!rows[i].trim()) continue;
+                    const columns = parseCSVLine(rows[i], delimiter);
+                    if (!columns[colCode]) continue;
+
+                    // ✅ FIXED: Strip "Voucher - " prefix before matching so user just types the number
+                    let cleanedSheetCode = columns[colCode].replace(/Voucher\s*-\s*/i, '').trim();
+
+                    if (cleanedSheetCode.toLowerCase() === userInput) {
+                        foundVoucher = {
+                            code: cleanedSheetCode.toUpperCase(),
+                            startTime: (columns[colStart] || '').replace(/[\r\n]+/g, ' ').trim(),
+                            status: (columns[colStatus] || '').replace(/[\r\n]+/g, ' ').trim().toLowerCase(),
+                            expiryText: (columns[colExpiry] || '').replace(/[\r\n]+/g, ' ').trim()
+                        };
+                        break;
+                    }
+                }
+
+                if (!foundVoucher) {
+                    alert("Voucher not found. Please check your code. ⚠️");
+                    renderView('view-entry');
+                    return;
+                }
+
+                // ✅ FIXED: Use the 'status' column from the sheet as the primary validity check
+                const sheetSaysValid = foundVoucher.status === 'valid';
+
+                // Also calculate days remaining from Expirationtime for display
+                const today = new Date();
+                const expiryDate = parseSheetDateString(foundVoucher.expiryText);
+                let daysRemainingText = '--';
+                let isExpired = !sheetSaysValid; // trust the sheet's status column
+
+                if (expiryDate && !isNaN(expiryDate.getTime())) {
+                    const timeDiff = expiryDate.getTime() - today.getTime();
+                    const diffInDays = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+                    if (diffInDays > 1) {
+                        daysRemainingText = `${diffInDays} Days`;
+                    } else if (diffInDays === 1) {
+                        daysRemainingText = `1 Day (Expires Tomorrow)`;
+                    } else if (diffInDays === 0) {
+                        daysRemainingText = `Expires Today`;
+                    } else {
+                        daysRemainingText = `Expired`;
+                        isExpired = true;
+                    }
+                } else {
+                    daysRemainingText = sheetSaysValid ? 'Active' : 'Expired';
+                }
+
+                // Populate voucher code display
+                document.getElementById('dash-code-display').innerText = foundVoucher.code;
+
+                if (isExpired) {
+                    document.getElementById('notification-section').classList.add('hidden');
+                    document.getElementById('status-icon-active').classList.add('hidden');
+                    document.getElementById('status-icon-expired').classList.remove('hidden');
+
+                    const titleText = document.getElementById('dash-status-title');
+                    titleText.innerText = "Voucher Inactive";
+                    titleText.className = "text-xl font-semibold tracking-tight text-rose-600";
+
+                    // ✅ Show actual sheet values even for expired vouchers
+                    const statusBadge = document.getElementById('dash-status-badge');
+                    statusBadge.innerText = foundVoucher.status || 'expired';
+                    statusBadge.className = "text-sm font-semibold px-3 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-200 capitalize";
+
+                    document.getElementById('dash-time').innerText = foundVoucher.startTime || '--';
+                    document.getElementById('dash-time').className = "text-sm font-semibold text-right max-w-[200px] text-gray-400";
+
+                    document.getElementById('dash-data').innerText = foundVoucher.expiryText || '--';
+                    document.getElementById('dash-data').className = "text-sm font-semibold text-right max-w-[200px] text-rose-500";
+
+                    const speedBadge = document.getElementById('dash-speed');
+                    speedBadge.innerText = daysRemainingText;
+                    speedBadge.className = "text-sm font-medium bg-rose-50 text-rose-500 px-3 py-1 rounded-md";
+
+                    renderView('view-dashboard');
+                    return;
+                }
+
+                // ✅ SUCCESS STATE — show all 4 Google Sheet columns clearly
+                document.getElementById('status-icon-expired').classList.add('hidden');
+                document.getElementById('status-icon-active').classList.remove('hidden');
+
+                const titleText = document.getElementById('dash-status-title');
+                titleText.innerText = "Voucher Active";
+                titleText.className = "text-xl font-semibold tracking-tight text-emerald-600";
+
+                const statusBadge = document.getElementById('dash-status-badge');
+                statusBadge.innerText = foundVoucher.status || 'valid';
+                statusBadge.className = "text-sm font-semibold px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 capitalize";
+
+                document.getElementById('dash-time').innerText = foundVoucher.startTime || '--';
+                document.getElementById('dash-time').className = "text-sm font-semibold text-right max-w-[200px] text-gray-900";
+
+                document.getElementById('dash-data').innerText = foundVoucher.expiryText || '--';
+                document.getElementById('dash-data').className = "text-sm font-semibold text-right max-w-[200px] text-emerald-700";
+
+                const speedBadge = document.getElementById('dash-speed');
+                speedBadge.innerText = daysRemainingText;
+                speedBadge.className = "text-sm font-medium bg-blue-50 text-blue-600 px-3 py-1 rounded-md";
+
+                setupNotification(foundVoucher.expiryText, foundVoucher.code);
+                renderView('view-dashboard');
+
+            } catch (err) {
+                alert("Voucher not valid/Expired  ⚠️");
+                renderView('view-entry');
+            }
+        }
+
+        document.getElementById('voucher-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') streamLiveVerification();
+        });
+
+        function backToEntryView() { 
+            document.getElementById('voucher-input').value = ''; 
+            const notifySection = document.getElementById('notification-section');
+            if (notifySection) notifySection.classList.add('hidden');
+            renderView('view-entry'); 
+        }
+    </script>
+</body>
+</html>
