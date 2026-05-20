@@ -26,7 +26,7 @@ function parseCSVLine(text, delimiter) {
             currentColumn = '';
         } else {
             currentColumn += char;
-        }
+          }
     }
     columns.push(currentColumn.trim());
     return columns.map(col => col.replace(/^["']|["']$/g, '').trim());
@@ -97,28 +97,28 @@ async function streamLiveVerification() {
         const cloudData = await cloudResponse.json();
         const activeUrl = cloudData.record.url;
 
-        if (!activeUrl) throw new Error("JSONBin mapping target empty.");
+        if (!activeUrl) throw new Error("Cloud mapping parameters verified empty.");
 
         const match = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-        if (!match) throw new Error("Google Spreadsheet key missing.");
+        if (!match) throw new Error("Google source URL pattern error.");
         
         const spreadsheetId = match[1];
         const csvEndpoint = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&cache_bypass=${Date.now()}`;
 
         const response = await fetch(csvEndpoint);
-        if (!response.ok) throw new Error(`Google error: ${response.status}`);
+        if (!response.ok) throw new Error(`Google Sheet rejected request: ${response.status}`);
         
         const csvText = await response.text();
         const rows = csvText.split(/\r?\n/);
-        if (rows.length < 2) throw new Error("Sheet is empty.");
+        if (rows.length < 2) throw new Error("Target matrix database empty.");
 
         let delimiter = rows[0].includes(';') ? ';' : ',';
 
-        // Direct Index Locks (A=0, B=1, C=2, D=3)
-        let codeIdx = 0;
-        let startTimeIdx = 1;
-        let durationIdx = 2;
-        let expirationIdx = 3;
+        // 🎯 DIRECT LOCKED EXTRACTION BY FIELD POSITIONS
+        let codeIdx = 0;         // Column A
+        let startTimeIdx = 1;    // Column B
+        let durationIdx = 2;     // Column C
+        let expirationIdx = 3;   // Column D
 
         let matchedRowFields = null;
 
@@ -172,7 +172,7 @@ async function streamLiveVerification() {
             }
         }
 
-        // Inject fields dynamically into the newly updated HTML grid layout!
+        // 🍎 Build separated elegant data list rows
         gridContainer.innerHTML += createDisplayRow("Voucher Code", voucherCodeDisplay, false);
         gridContainer.innerHTML += createDisplayRow("Start Time", startTimeVal, false);
         gridContainer.innerHTML += createDisplayRow("Plan Duration", durationVal, false);
@@ -219,5 +219,12 @@ document.addEventListener('DOMContentLoaded', () => {
         inputEl.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') streamLiveVerification();
         });
+    }
+
+    // ⚡ Automatic cleanup for service worker registration overrides
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').then(reg => {
+            reg.update(); // Force look for V2 cache changes immediately
+        }).catch(err => console.log("SW Registration failure:", err));
     }
 });
