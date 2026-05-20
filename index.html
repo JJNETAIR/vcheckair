@@ -17,7 +17,7 @@
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: { sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"Helvetica Neue"', 'sans-serif'] },
+                    fontFamily: { sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', 'sans-serif'] },
                     boxShadow: { 'apple': '0 4px 30px rgba(0, 0, 0, 0.02)' }
                 }
             }
@@ -36,11 +36,10 @@
     </header>
 
     <main class="w-full max-w-md mx-auto px-5 flex-grow flex flex-col justify-center items-center">
-        
         <div id="view-entry" class="w-full bg-white rounded-3xl p-6 shadow-apple border border-gray-100/80 space-y-6">
             <div class="text-center space-y-2">
                 <h1 class="text-2xl font-bold tracking-tight">Voucher Verification</h1>
-                <p class="text-xs text-[#86868B] leading-relaxed max-w-[280px] mx-auto">Enter your credentials below to pull live validation profiles directly from database.</p>
+                <p class="text-xs text-[#86868B] max-w-[280px] mx-auto">Enter your credentials below to pull live validation profiles directly from database.</p>
             </div>
             <div class="space-y-4">
                 <input type="text" id="voucher-input" placeholder="Enter Voucher Code" autocomplete="off" class="w-full px-4 py-4 bg-[#F5F5F7] rounded-2xl text-base font-bold text-center uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-inner tracking-widest placeholder:tracking-normal placeholder:font-normal">
@@ -50,7 +49,6 @@
 
         <div id="view-dashboard" class="w-full space-y-4 hidden">
             <div class="bg-white rounded-3xl p-6 shadow-apple border border-gray-100/80 space-y-6">
-                
                 <div class="flex items-center justify-between border-b border-gray-100 pb-4">
                     <div>
                         <p class="text-[10px] font-bold text-[#86868B] uppercase tracking-widest mb-0.5">Active Voucher</p>
