@@ -4,73 +4,44 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Apple Air - Voucher Portal</title>
-    
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Apple Air">
-    
-    <link rel="apple-touch-icon" href="icons/icon-192.png">
-    <link rel="manifest" href="manifest.json">
-
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', 'sans-serif'] },
-                    boxShadow: { 'apple': '0 4px 30px rgba(0, 0, 0, 0.03)', 'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.06)' }
-                }
-            }
-        }
-    </script>
 </head>
-<body class="bg-[#F5F5F7] text-[#1D1D1F] min-h-screen flex flex-col justify-between">
-    
-    <header class="w-full py-10 px-8 flex justify-center items-center">
-        <div class="flex items-center space-x-4">
-            <div class="w-14 h-14 rounded-2xl bg-white/40 border border-white/60 backdrop-blur-md shadow-apple flex items-center justify-center">
-                <svg class="w-7 h-7 text-[#1D1D1F]/70" viewBox="0 0 170 170" fill="currentColor">
-                    <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.34.13-9.13-1.92-14.38-6.15-3.61-2.94-7.49-7.79-11.65-14.54-7.85-12.77-13.2-26.6-16.03-41.48-2.83-14.88-2.01-28.52 2.45-40.91 4.43-12.22 11.3-21.7 20.62-28.44 9.33-6.73 19.75-10.22 31.28-10.46 6.15 0 12.89 1.62 20.21 4.88 7.32 3.24 11.65 4.88 12.98 4.88 1.15 0 5.66-1.7 13.56-5.07 7.9-3.39 14.47-4.85 19.72-4.39 14.54.99 25.86 6.43 33.95 16.32-13.25 8.07-19.72 19.12-19.41 33.14.31 10.87 4.25 19.86 11.82 26.94 7.57 7.12 16.59 10.98 27.06 11.59-2.26 6.74-5.3 13.6-9.12 20.57zM119.55 31.25c0-7.71 2.76-14.88 8.27-21.52 5.51-6.64 12.37-10.74 20.57-12.3 1.02 8.33-1.63 16.12-7.96 23.37-6.33 7.25-13.56 11.45-21.68 12.59-.44-1.42-.7-2.14-.7-2.14z"/>
-                </svg>
-            </div>
-            <span class="text-2xl font-semibold tracking-tight text-[#1D1D1F]">Apple Air</span>
+<body class="bg-[#F5F5F7] text-[#1D1D1F] min-h-screen p-4 md:p-8">
+
+    <header class="max-w-md mx-auto mb-8 text-center">
+        <div class="w-16 h-16 bg-white rounded-3xl mx-auto mb-4 shadow-lg flex items-center justify-center">
+            <span class="text-3xl"></span>
         </div>
+        <h1 class="text-2xl font-bold tracking-tight">Apple Air Portal</h1>
+        <p class="text-gray-500 text-sm">Secure Voucher Verification</p>
     </header>
 
-    <main class="w-full max-w-md mx-auto px-6 flex-grow flex flex-col justify-center items-center">
-        <div id="view-entry" class="w-full bg-white/70 border border-white/60 backdrop-blur-xl rounded-3xl p-8 shadow-glass space-y-8">
-            <div class="text-center space-y-2">
-                <h1 class="text-2xl font-semibold tracking-tight">Internet Voucher</h1>
-                <p class="text-sm text-[#86868B]">Enter your code to pull live validation profile directly from Festa server sync.</p>
-            </div>
-            <div class="space-y-4">
-                <input type="text" id="voucher-input" placeholder="Enter Voucher Code" autocomplete="off" class="w-full px-5 py-4 bg-white/50 border border-gray-200 rounded-2xl text-base font-medium text-center uppercase focus:outline-none focus:border-blue-500 focus:bg-white shadow-inner">
-                <button id="check-btn" class="w-full py-4 bg-[#0071E3] hover:bg-[#0077ED] text-white font-medium rounded-2xl shadow-md transition-colors">Check Validity</button>
-            </div>
+    <main class="max-w-md mx-auto">
+        <div id="view-entry" class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+            <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Voucher Code</label>
+            <input type="text" id="voucher-input" placeholder="Enter Code (e.g., A123)" 
+                   class="w-full bg-gray-50 rounded-2xl p-4 mb-4 text-lg font-medium outline-none border-2 border-transparent focus:border-blue-500 transition-all">
+            <button id="check-btn" class="w-full bg-black text-white py-4 rounded-2xl font-semibold hover:bg-gray-800 transition-all">
+                Validate Voucher
+            </button>
         </div>
 
-        <div id="view-dashboard" class="w-full bg-white/70 border border-white/60 backdrop-blur-xl rounded-3xl p-6 shadow-glass space-y-6 hidden">
-            <div class="flex flex-col items-center text-center space-y-2">
-                <div id="status-icon-active" class="hidden w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-500 text-xl font-bold">✓</div>
-                <div id="status-icon-expired" class="hidden w-12 h-12 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-500 text-xl font-bold">✕</div>
-                
-                <h2 id="dash-status-title" class="text-xl font-semibold tracking-tight">Voucher Status</h2>
-                <p id="dash-code-display" class="text-xs font-mono bg-gray-100 text-gray-600 px-3 py-1 rounded-full uppercase tracking-wider font-bold">CODE</p>
+        <div id="view-dashboard" class="hidden space-y-4">
+            <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Connection Details</h3>
+                <div id="festa-data-container" class="space-y-4">
+                    </div>
             </div>
-
-            <div id="festa-data-container" class="bg-white/50 border border-gray-100 rounded-2xl overflow-hidden divide-y divide-gray-100 shadow-inner">
-                </div>
-
-            <button id="back-btn" class="w-full py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-2xl transition-colors">Check Another Voucher</button>
+            <button id="back-btn" class="w-full bg-gray-200 text-gray-700 py-4 rounded-2xl font-semibold">
+                Back to Search
+            </button>
         </div>
 
-        <div id="view-loading" class="hidden flex flex-col items-center space-y-4">
-            <div class="w-8 h-8 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin"></div>
-            <p class="text-xs font-medium text-[#86868B]">Streaming raw database tables from cloud sync...</p>
+        <div id="view-loading" class="hidden text-center py-10">
+            <div class="animate-spin w-8 h-8 border-4 border-gray-300 border-t-black rounded-full mx-auto"></div>
+            <p class="mt-4 text-sm text-gray-500">Syncing with server...</p>
         </div>
     </main>
-
-    <footer class="w-full py-6 text-center text-[11px] text-[#86868B]">&copy; 2026 Apple Air. All rights reserved.</footer>
 
     <script src="app.js"></script>
 </body>
