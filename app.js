@@ -12,6 +12,7 @@ function renderView(viewId) {
     });
 }
 
+// 🛠️ HEAVY DUTY CLEANER PARSER (Handles Festa Tab/Comma line splits perfectly)
 function parseCSVLine(text, delimiter) {
     let columns = [];
     let insideQuotes = false;
@@ -71,21 +72,11 @@ function parseSheetDateString(str) {
     return new Date(year, month, day, hours, minutes, seconds);
 }
 
-// Generates Apple design style rows dynamically for whatever data fields exist
-// Converts system terms into friendly terms (e.g., "Duration" to "Validity")
 function createDisplayRow(label, value, isHighlight = false) {
     let valueColorClass = isHighlight ? "text-emerald-600 font-semibold" : "text-gray-900 font-semibold";
-    
-    // Auto translate technical terms for cleaner design display
-    let finalLabel = label.trim();
-    if (/vouch|code/i.test(finalLabel)) finalLabel = "Voucher Code";
-    if (/profile|rate|tier|pkg/i.test(finalLabel)) finalLabel = "Speed Profile";
-    if (/durat|time|expir|valid/i.test(finalLabel)) finalLabel = "Duration Limit";
-    if (/byte|data|allow|volum/i.test(finalLabel)) finalLabel = "Data Allowance";
-
     return `
         <div class="flex justify-between items-center px-5 py-4">
-            <span class="text-sm font-medium text-[#86868B]">${finalLabel}</span>
+            <span class="text-sm font-medium text-[#86868B]">${label}</span>
             <span class="text-base text-right max-w-[220px] leading-tight ${valueColorClass}">${value}</span>
         </div>
     `;
@@ -107,33 +98,39 @@ async function streamLiveVerification() {
         const cloudData = await cloudResponse.json();
         const activeUrl = cloudData.record.url;
 
-        if (!activeUrl) throw new Error("JSONBin link configuration string target mapping table is empty.");
+        if (!activeUrl) throw new Error("JSONBin mapping target missing.");
 
         const match = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-        if (!match) throw new Error("Google spreadsheet unique URL tracking ID could not be parsed.");
+        if (!match) throw new Error("Google unique sheet link ID could not be parsed.");
         
         const spreadsheetId = match[1];
         const csvEndpoint = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&cache_bypass=${Date.now()}`;
 
         const response = await fetch(csvEndpoint);
-        if (!response.ok) throw new Error(`Google engine rejected synchronization: ${response.status}`);
+        if (!response.ok) throw new Error(`Google rejected: ${response.status}`);
         
         const csvText = await response.text();
         const rows = csvText.split(/\r?\n/);
-        if (rows.length < 2) throw new Error("Database contains empty rows.");
+        if (rows.length < 2) throw new Error("Database sheet contains empty rows.");
 
         let delimiter = rows[0].includes(';') ? ';' : ',';
         const rawHeaders = parseCSVLine(rows[0], delimiter);
+        
+        // Match columns cleanly by mapping out strings exactly
         const headersCleaned = rawHeaders.map(h => h.toLowerCase().replace(/[^a-z0-9]/g, '').trim());
         
-        // Advanced Festa matching logic - handles columns in any positional order automatically
-        let codeIdx = headersCleaned.findIndex(h => h.includes('vouch') || h.includes('code') || h.includes('auth'));
-        let timeIdx = headersCleaned.findIndex(h => h.includes('durat') || h.includes('time') || h.includes('expir') || h.includes('valid'));
-        
-        if (codeIdx === -1) codeIdx = 0; // Safe defaults if indexes aren't resolved cleanly
+        let codeIdx = headersCleaned.findIndex(h => h.includes('vouch') || h.includes('code'));
+        let profileIdx = headersCleaned.findIndex(h => h.includes('profi') || h.includes('rate') || h.includes('tier') || h.includes('pkg'));
+        let durationIdx = headersCleaned.findIndex(h => h.includes('durat') || h.includes('time') || h.includes('valid'));
+        let dataIdx = headersCleaned.findIndex(h => h.includes('data') || h.includes('limit') || h.includes('allow') || h.includes('volum'));
 
-        let matchedRowIndex = -1;
-        let foundRowFields = [];
+        // Absolute safe fallback offsets if header strings fail to match perfectly
+        if (codeIdx === -1) codeIdx = 0;
+        if (profileIdx === -1) profileIdx = 1;
+        if (durationIdx === -1) durationIdx = 2;
+        if (dataIdx === -1) dataIdx = 3;
+
+        let matchedRowFields = null;
 
         for (let i = 1; i < rows.length; i++) {
             if (!rows[i].trim()) continue;
@@ -144,60 +141,53 @@ async function streamLiveVerification() {
                 let userCodeClean = userInput.replace(/[^0-9a-zA-Z]/g, '').toLowerCase();
 
                 if (sheetCodeClean === userCodeClean && userCodeClean.length > 0) {
-                    matchedRowIndex = i;
-                    foundRowFields = columns;
+                    matchedRowFields = columns;
                     break;
                 }
             }
         }
 
-        if (matchedRowIndex === -1) {
+        if (!matchedRowFields) {
             alert("Voucher mismatch or not found in active database sheet! ⚠️");
             renderView('view-entry');
             return;
         }
 
-        // Build the dashboard dynamically based on whatever column structure is present inside the CSV table
         const gridContainer = document.getElementById('festa-data-container');
         gridContainer.innerHTML = ''; 
 
-        let voucherCodeDisplay = foundRowFields[codeIdx].toUpperCase();
-        let expiryString = timeIdx !== -1 ? foundRowFields[timeIdx] : '';
-        let isExpired = false;
+        let voucherCodeDisplay = (matchedRowFields[codeIdx] || userInput).toUpperCase();
+        let speedProfileVal = matchedRowFields[profileIdx] || 'Standard Plan';
+        let durationVal = matchedRowFields[durationIdx] || 'Unlimited';
+        let dataAllowanceVal = matchedRowFields[dataIdx] || 'Unlimited Data';
 
-        // Process expiration time checks safely
-        if (expiryString) {
-            const expiryDate = parseSheetDateString(expiryString);
-            if (expiryDate && !isNaN(expiryDate.getTime())) {
-                const today = new Date();
-                if (expiryDate.getTime() < today.getTime()) {
-                    isExpired = true;
-                } else {
-                    const diffDays = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                    if (diffDays > 1) expiryString += ` (${diffDays} Days Left)`;
-                    else if (diffDays === 1) expiryString += ` (1 Day Left)`;
-                    else expiryString += ` (Expires Today)`;
-                }
+        let isExpired = false;
+        const expiryDate = parseSheetDateString(durationVal);
+        if (expiryDate && !isNaN(expiryDate.getTime())) {
+            const today = new Date();
+            if (expiryDate.getTime() < today.getTime()) {
+                isExpired = true;
+            } else {
+                const diffDays = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                if (diffDays > 1) durationVal += ` (${diffDays} Days Left)`;
+                else if (diffDays === 1) durationVal += ` (1 Day Left)`;
+                else durationVal += ` (Expires Today)`;
             }
         }
 
-        // Generate card layout
-        rawHeaders.forEach((headerTitle, index) => {
-            let fieldVal = foundRowFields[index] || '--';
-            
-            // Clean display value up if it has system line breaks
-            fieldVal = fieldVal.replace(/[\r\n]+/g, ' ').trim();
+        // Clean out any raw double line breaks from the values
+        speedProfileVal = speedProfileVal.replace(/[\r\n]+/g, ' ').trim();
+        durationVal = durationVal.replace(/[\r\n]+/g, ' ').trim();
+        dataAllowanceVal = dataAllowanceVal.replace(/[\r\n]+/g, ' ').trim();
 
-            if (index === timeIdx) {
-                gridContainer.innerHTML += createDisplayRow(headerTitle, isExpired ? "Expired" : expiryString, !isExpired);
-            } else {
-                gridContainer.innerHTML += createDisplayRow(headerTitle, fieldVal, false);
-            }
-        });
+        // 🍎 Build clean design layout rows right inside the card frame
+        gridContainer.innerHTML += createDisplayRow("Voucher Code", voucherCodeDisplay, false);
+        gridContainer.innerHTML += createDisplayRow("Speed Profile", speedProfileVal, false);
+        gridContainer.innerHTML += createDisplayRow("Duration Limit", isExpired ? "Expired" : durationVal, !isExpired);
+        gridContainer.innerHTML += createDisplayRow("Data Allowance", dataAllowanceVal, false);
 
         document.getElementById('dash-code-display').innerText = voucherCodeDisplay;
 
-        // Display states
         if (isExpired) {
             document.getElementById('status-icon-active').classList.add('hidden');
             document.getElementById('status-icon-expired').classList.remove('hidden');
