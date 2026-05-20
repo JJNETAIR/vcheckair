@@ -102,6 +102,7 @@
         function renderView(viewId) {
             ['view-entry', 'view-dashboard', 'view-loading'].forEach(v => {
                 const el = document.getElementById(v);
+                if (!el) return;
                 if (v === viewId) {
                     el.classList.remove('hidden');
                     setTimeout(() => el.classList.remove('opacity-0', 'translate-y-4'), 20);
@@ -109,8 +110,19 @@
             });
         }
 
+        // Flexible date parser configured to read text date values cleanly
         function parseSheetDateString(str) {
             if (!str) return null;
+            
+            // Format fallback wrapper for standard text: "May 20, 2026 09:00:51 am"
+            const cleanedStr = str.replace(/(am|pm)/i, '').trim();
+            const parsedTimestamp = Date.parse(cleanedStr);
+            
+            if (!isNaN(parsedTimestamp)) {
+                return new Date(parsedTimestamp);
+            }
+
+            // Fallback for fallback slashes DD/MM/YYYY
             const parts = str.split('/');
             if (parts.length === 3) {
                 const day = parseInt(parts[0], 10);
@@ -118,61 +130,88 @@
                 const year = parseInt(parts[2], 10);
                 return new Date(year, month, day);
             }
-            return new Date(str);
+            return null;
         }
 
-        // Handles the calculation and execution for the notification workflow
-        function handleVoucherNotification(rawExpiryText, voucherCode) {
-            const container = document.getElementById('notification-section');
-            const btn = document.getElementById('notify-me-btn');
-            const statusText = document.getElementById('notify-status');
+        // 🔔 PERSISTENT DEVICE NOTIFICATION CONTROLLER (SCOPED VIA ASYNC INDEXEDDB)
+        function setupNotification(expiryDateString, voucherCode) {
+            const notifySection = document.getElementById('notification-section');
+            const notifyBtn = document.getElementById('notify-me-btn');
+            const notifyStatus = document.getElementById('notify-status');
             
-            const expiryDate = parseSheetDateString(rawExpiryText);
-            if (!expiryDate || isNaN(expiryDate.getTime())) {
-                container.classList.add('hidden');
-                return;
-            }
+            if (!notifySection || !notifyBtn || !notifyStatus) return;
 
-            container.classList.remove('hidden');
+            const storageKeyDate = `alert_date_${voucherCode.toLowerCase()}`;
+            const storageKeyStatus = `alert_status_${voucherCode.toLowerCase()}`;
 
-            // Reset state defaults
-            btn.innerHTML = '<span>Notify Me 1 Day Before Expiry</span> <span>🔔</span>';
-            btn.className = "w-full py-3 px-4 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-600 font-medium flex items-center justify-center space-x-2 active:scale-95 transition-transform";
-            statusText.classList.add('hidden');
+            notifySection.classList.remove('hidden');
 
-            // Check if reminder was already saved in local storage for this code
-            if (localStorage.getItem(`alert_target_${voucherCode}`)) {
-                const targetedDate = localStorage.getItem(`alert_target_${voucherCode}`);
-                btn.innerHTML = '<span>Reminder Active</span> <span>✅</span>';
-                btn.className = "w-full py-3 px-4 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 font-medium flex items-center justify-center space-x-2 pointer-events-none";
-                statusText.innerText = `Alert arms on: ${targetedDate}`;
-                statusText.classList.remove('hidden');
-                return;
-            }
+            // Initialize/Open IndexedDB Connection
+            const dbRequest = indexedDB.open('AppleAirDB', 1);
+            dbRequest.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('alerts')) db.createObjectStore('alerts');
+            };
 
-            btn.onclick = async () => {
+            dbRequest.onsuccess = (e) => {
+                const db = e.target.result;
+                const transaction = db.transaction('alerts', 'readonly');
+                const store = transaction.objectStore('alerts');
+                const getReq = store.get(storageKeyDate);
+
+                getReq.onsuccess = () => {
+                    if (getReq.result) {
+                        // Lock button state if already scheduled
+                        notifyBtn.innerHTML = '<span>Reminder Scheduled!</span> <span>✅</span>';
+                        notifyBtn.className = "w-full py-3 px-4 rounded-xl bg-green-50/80 border border-green-200 text-green-600 font-medium flex items-center justify-center space-x-2 pointer-events-none";
+                        notifyStatus.innerText = `We will alert you on ${getReq.result}`;
+                        notifyStatus.classList.remove('hidden');
+                    } else {
+                        // Reset defaults for clean vouchers
+                        notifyBtn.innerHTML = '<span>Notify Me 1 Day Before Expiry</span> <span>🔔</span>';
+                        notifyBtn.className = "w-full py-3 px-4 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-600 font-medium flex items-center justify-center space-x-2 active:scale-95 transition-transform";
+                        notifyStatus.classList.add('hidden');
+                    }
+                };
+            };
+
+            notifyBtn.onclick = async () => {
                 if (!('Notification' in window)) {
-                    alert('This browser does not support web notifications.');
+                    alert('This device does not support native notifications.');
                     return;
                 }
 
                 const permission = await Notification.requestPermission();
                 if (permission === 'granted') {
-                    const targetAlertDate = new Date(expiryDate);
-                    targetAlertDate.setDate(targetAlertDate.getDate() - 1);
-                    
-                    const alertString = targetAlertDate.toLocaleDateString('en-GB'); 
-                    
-                    localStorage.setItem(`alert_target_${voucherCode}`, alertString);
-                    localStorage.setItem(`alert_status_${voucherCode}`, 'pending');
-                    
-                    btn.innerHTML = '<span>Reminder Active</span> <span>✅</span>';
-                    btn.className = "w-full py-3 px-4 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 font-medium flex items-center justify-center space-x-2 pointer-events-none";
-                    
-                    statusText.innerText = `Alert arms on: ${alertString}`;
-                    statusText.classList.remove('hidden');
+                    const expiryDate = parseSheetDateString(expiryDateString);
+                    if (!expiryDate) {
+                        alert('Could not map date structure requirements.');
+                        return;
+                    }
+
+                    // Subtract exactly 1 day for alert scheduling
+                    const alertDate = new Date(expiryDate);
+                    alertDate.setDate(alertDate.getDate() - 1);
+                    const alertString = alertDate.toLocaleDateString('en-GB'); // DD/MM/YYYY
+
+                    // Write to IndexedDB
+                    const dbReq = indexedDB.open('AppleAirDB', 1);
+                    dbReq.onsuccess = (event) => {
+                        const db = event.target.result;
+                        const tx = db.transaction('alerts', 'readwrite');
+                        const store = tx.objectStore('alerts');
+                        store.put(alertString, storageKeyDate);
+                        store.put('pending', storageKeyStatus);
+
+                        tx.oncomplete = () => {
+                            notifyBtn.innerHTML = '<span>Reminder Scheduled!</span> <span>✅</span>';
+                            notifyBtn.className = "w-full py-3 px-4 rounded-xl bg-green-50/80 border border-green-200 text-green-600 font-medium flex items-center justify-center space-x-2 pointer-events-none";
+                            notifyStatus.innerText = `We will alert you on ${alertString}`;
+                            notifyStatus.classList.remove('hidden');
+                        };
+                    };
                 } else {
-                    alert('Please authorize notifications inside your hardware/browser options layout.');
+                    alert("Please change permissions inside browser setup layouts.");
                 }
             };
         }
@@ -190,10 +229,10 @@
                 const cloudData = await cloudResponse.json();
                 const activeUrl = cloudData.record.url;
 
-                if (!activeUrl) throw new Error("Missing link.");
+                if (!activeUrl) throw new Error("Missing cloud database link.");
 
                 const match = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-                if (!match) throw new Error("Invalid format.");
+                if (!match) throw new Error("Invalid spreadsheet mapping format.");
                 
                 const spreadsheetId = match[1];
                 const csvEndpoint = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=0&cache_bypass=${Date.now()}`;
@@ -205,9 +244,10 @@
                 let delimiter = rows[0].includes(';') ? ';' : ',';
                 const headers = rows[0].split(delimiter).map(h => h.replace(/^["']|["']$/g, '').trim().toLowerCase());
                 
-                const codeColumnIndex = headers.indexOf('code');
-                const timeColumnIndex = headers.indexOf('timeremaining');
-                const speedColumnIndex = headers.indexOf('speedtier');
+                // Track columns mapped smoothly to your new dashboard layout configuration
+                const codeColumnIndex = headers.indexOf('code'); // AUTHORIZED BY column
+                const timeColumnIndex = headers.indexOf('timeremaining'); // EXPIRATION TIME column
+                const speedColumnIndex = headers.indexOf('speedtier'); // Optional profile column
 
                 let foundVoucher = null;
 
@@ -215,13 +255,18 @@
                     if (!rows[i].trim()) continue;
                     const columns = rows[i].split(delimiter).map(c => c.replace(/^["']|["']$/g, '').trim());
                     
-                    if (columns[codeColumnIndex] && columns[codeColumnIndex].toLowerCase() === userInput) {
-                        foundVoucher = {
-                            code: columns[codeColumnIndex].toUpperCase(),
-                            expiryText: columns[timeColumnIndex] || '',
-                            speedTier: columns[speedColumnIndex] || 'High Profile'
-                        };
-                        break;
+                    if (columns[codeColumnIndex]) {
+                        // 🔍 REARRANGE ENGINE FIX: Automatically extract trailing token values and remove "Voucher - " if copied wholesale
+                        let cleanedSheetCode = columns[codeColumnIndex].replace(/Voucher\s*-\s*/i, '').trim();
+
+                        if (cleanedSheetCode.toLowerCase() === userInput) {
+                            foundVoucher = {
+                                code: cleanedSheetCode.toUpperCase(),
+                                expiryText: columns[timeColumnIndex] || '',
+                                speedTier: columns[speedColumnIndex] || 'HIGH'
+                            };
+                            break;
+                        }
                     }
                 }
 
@@ -232,14 +277,12 @@
                 }
 
                 const today = new Date();
-                today.setHours(0,0,0,0);
                 
                 const expiryDate = parseSheetDateString(foundVoucher.expiryText);
                 let combinedDisplayString = foundVoucher.expiryText; 
                 let isExpired = false;
 
                 if (expiryDate && !isNaN(expiryDate.getTime())) {
-                    expiryDate.setHours(0,0,0,0);
                     const timeDiff = expiryDate.getTime() - today.getTime();
                     const diffInDays = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
 
@@ -247,23 +290,24 @@
                         combinedDisplayString = `${foundVoucher.expiryText} (${diffInDays} Days Remaining)`;
                     } else if (diffInDays === 1) {
                         combinedDisplayString = `${foundVoucher.expiryText} (1 Day Remaining)`;
-                    } else if (diffInDays === 0) {
+                    } else if (diffInDays === 0 || (timeDiff > 0 && diffInDays <= 0)) {
                         combinedDisplayString = `${foundVoucher.expiryText} (Expires Today)`;
                     } else {
                         isExpired = true;
                     }
+                } else {
+                    // Fallback configuration standard if time string parsing fails
+                    combinedDisplayString = foundVoucher.expiryText;
                 }
 
                 if (isExpired) {
                     alert("Voucher not valid/Expired  ⚠️");
                     document.getElementById('notification-section').classList.add('hidden');
 
-                    const expiredIcon = document.getElementById('status-icon-expired');
-                    const titleText = document.getElementById('dash-status-title');
-                    
                     document.getElementById('status-icon-active').classList.add('hidden');
-                    expiredIcon.classList.remove('hidden');
+                    document.getElementById('status-icon-expired').classList.remove('hidden');
                     
+                    const titleText = document.getElementById('dash-status-title');
                     titleText.innerText = "Voucher Inactive";
                     titleText.className = "text-xl font-semibold tracking-tight text-rose-600";
                     
@@ -282,13 +326,11 @@
                     return;
                 }
 
-                const activeIcon = document.getElementById('status-icon-active');
-                const titleText = document.getElementById('dash-status-title');
-                const speedBadge = document.getElementById('dash-speed');
-
+                // Render Active Configurations Screen
                 document.getElementById('status-icon-expired').classList.add('hidden');
-                activeIcon.classList.remove('hidden');
+                document.getElementById('status-icon-active').classList.remove('hidden');
                 
+                const titleText = document.getElementById('dash-status-title');
                 titleText.innerText = "Voucher Active";
                 titleText.className = "text-xl font-semibold tracking-tight text-emerald-600";
                 
@@ -298,13 +340,14 @@
                 document.getElementById('dash-time').innerText = combinedDisplayString;
                 document.getElementById('dash-time').className = "text-base font-semibold text-emerald-600";
                 
+                const speedBadge = document.getElementById('dash-speed');
                 speedBadge.innerText = foundVoucher.speedTier;
                 speedBadge.className = "text-sm font-medium bg-blue-50 text-blue-600 px-3 py-1 rounded-md uppercase";
                 
                 document.getElementById('dash-code-display').innerText = foundVoucher.code;
                 
-                // Fire notification engine calculations
-                handleVoucherNotification(foundVoucher.expiryText, foundVoucher.code);
+                // Initialize notification tracking parameters
+                setupNotification(foundVoucher.expiryText, foundVoucher.code);
 
                 renderView('view-dashboard');
 
@@ -320,6 +363,8 @@
 
         function backToEntryView() { 
             document.getElementById('voucher-input').value = ''; 
+            const notifySection = document.getElementById('notification-section');
+            if (notifySection) notifySection.classList.add('hidden');
             renderView('view-entry'); 
         }
     </script>
