@@ -1,5 +1,6 @@
 /**
- * Apple Air - User Portal Interface Engine (Strict A, B, C, D Sheet Structure)
+ * Apple Air - Fixed Voucher Portal Engine
+ * Aligned strictly to: A: code | B: start time | C: status | D: Expirationtime
  */
 
 const BIN_ID = "6a0cacb36877513b279bbe63"; 
@@ -12,7 +13,7 @@ function renderView(viewId) {
     });
 }
 
-// Custom split parser handling internal column commas safely
+// Safe CSV Parser line splitter
 function parseCSVLine(text, delimiter) {
     if (!text) return [];
     let columns = [];
@@ -42,7 +43,7 @@ async function streamLiveVerification() {
     renderView('view-loading');
 
     try {
-        // 1. Fetch Google Sheet Link from JSONBin cloud layout configuration
+        // 1. Fetch Cloud Config
         const cloudResponse = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
             headers: { "X-Master-Key": MASTER_KEY }
         });
@@ -50,20 +51,17 @@ async function streamLiveVerification() {
         const activeUrl = cloudData.record.url;
         const spreadsheetId = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)[1];
         
-        // 2. Fetch fresh spreadsheet CSV with cache bypass
+        // 2. Fetch Spreadsheet Data with aggressive Cache Buster
         const response = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&cache_bypass=${Date.now()}`);
         const csvText = await response.text();
         const rows = csvText.split(/\r?\n/).filter(r => r.trim() !== "");
         
         if (rows.length === 0) throw new Error("Spreadsheet database is empty.");
 
-        // Auto-detect comma vs semicolon layout split delimiter
+        // Detect comma vs semicolon splitting rules
         const delimiter = rows[0].includes(';') ? ';' : ',';
 
-        // 3. Extract Headings row
-        const headers = parseCSVLine(rows[0], delimiter);
-        
-        // Find row targeting your column A safely
+        // 3. Match user row targeting Column A (Voucher Code)
         const matchedRow = rows.find(row => {
             const cols = parseCSVLine(row, delimiter);
             return cols[0] && cols[0].toLowerCase() === userInput;
@@ -77,49 +75,40 @@ async function streamLiveVerification() {
 
         const values = parseCSVLine(matchedRow, delimiter);
         
-        // Safely set top header identification layout value
+        // Set up the voucher display at the top header
         document.getElementById('dash-code-display').innerText = (values[0] || userInput).toUpperCase();
 
+        // 4. Fallback values if sheet rows are truncated/short
+        const startTime  = (values[1] && values[1].trim() !== "") ? values[1].trim() : "-";
+        const status     = (values[2] && values[2].trim() !== "") ? values[2].trim() : "-";
+        const expiration = (values[3] && values[3].trim() !== "") ? values[3].trim() : "-";
+
+        // Dynamic status layout styling color variables
+        let statusColors = "bg-[#F5F5F7] text-gray-900";
+        if (status.toLowerCase().includes('act') || status.toLowerCase().includes('live')) {
+            statusColors = "bg-emerald-50 text-emerald-700 border border-emerald-100/70";
+        } else {
+            statusColors = "bg-amber-50 text-amber-800 border border-amber-100/70";
+        }
+
+        // 5. Explicit structural card UI build out injection
         const container = document.getElementById('festa-data-container');
-        container.innerHTML = ''; 
-
-        // 4. Mapped Alignment Loop based exactly on Columns A, B, C, D
-        headers.forEach((header, index) => {
-            if (index === 0 || !header) return; // Skip code row redundantly
-
-            // Safety protection fallback if values are missing or cut short
-            let val = "-";
-            if (values[index] !== undefined && values[index] !== null) {
-                val = values[index].trim();
-            }
-            if (val === "") val = "-"; 
-
-            const cleanHeader = header.toLowerCase().trim();
-
-            // Distinct visual design color badges for matching your headers layout
-            let cardColors = "bg-[#F5F5F7] text-gray-900";
+        container.innerHTML = `
+            <div class="p-4 rounded-2xl flex flex-col justify-center space-y-1 bg-blue-50 text-blue-700 border border-blue-100/70">
+                <span class="text-[10px] font-bold uppercase tracking-wider opacity-60">Start Time</span>
+                <span class="text-base font-bold tracking-tight">${startTime}</span>
+            </div>
             
-            if (cleanHeader.includes('expir')) {
-                // Column D: Expirationtime
-                cardColors = "bg-rose-50 text-rose-700 border border-rose-100/70";
-            } else if (cleanHeader.includes('start')) {
-                // Column B: start time
-                cardColors = "bg-blue-50 text-blue-700 border border-blue-100/70";
-            } else if (cleanHeader.includes('status')) {
-                // Column C: status
-                if (val.toLowerCase().includes('act') || val.toLowerCase().includes('live')) {
-                    cardColors = "bg-emerald-50 text-emerald-700 border border-emerald-100/70";
-                } else {
-                    cardColors = "bg-amber-50 text-amber-800 border border-amber-100/70";
-                }
-            }
-
-            container.innerHTML += `
-                <div class="p-4 rounded-2xl flex flex-col justify-center space-y-1 ${cardColors}">
-                    <span class="text-[10px] font-bold uppercase tracking-wider opacity-60">${header}</span>
-                    <span class="text-base font-bold tracking-tight">${val}</span>
-                </div>`;
-        });
+            <div class="p-4 rounded-2xl flex flex-col justify-center space-y-1 ${statusColors}">
+                <span class="text-[10px] font-bold uppercase tracking-wider opacity-60">Status</span>
+                <span class="text-base font-bold tracking-tight">${status}</span>
+            </div>
+            
+            <div class="p-4 rounded-2xl flex flex-col justify-center space-y-1 bg-rose-50 text-rose-700 border border-rose-100/70">
+                <span class="text-[10px] font-bold uppercase tracking-wider opacity-60">Expiration Time</span>
+                <span class="text-base font-bold tracking-tight">${expiration}</span>
+            </div>
+        `;
 
         renderView('view-dashboard');
 
