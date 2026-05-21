@@ -100,7 +100,88 @@
         </div>
     </main>
 
-    <footer class="w-full py-6 text-center text-[11px] text-[#86868B]">&copy; 2026 Apple Air. All rights reserved.</footer>
+    <!-- Bottom Navigation -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-gray-200 flex z-50">
+        <button onclick="switchTab('voucher')" id="tab-voucher" class="flex-1 py-3 flex flex-col items-center gap-1 text-[#0071E3]">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/></svg>
+            <span class="text-[10px] font-medium">Voucher</span>
+        </button>
+        <button onclick="switchTab('speedtest')" id="tab-speedtest" class="flex-1 py-3 flex flex-col items-center gap-1 text-[#86868B]">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <span class="text-[10px] font-medium">Speed Test</span>
+        </button>
+    </nav>
+
+    <!-- Speed Test Page -->
+    <div id="view-speedtest" class="hidden fixed inset-0 bg-[#F5F5F7] flex flex-col z-40">
+        <!-- Header -->
+        <div class="w-full py-8 px-8 flex justify-center items-center">
+            <div class="flex items-center space-x-4">
+                <div class="w-14 h-14 rounded-2xl bg-white/40 border border-white/60 backdrop-blur-md shadow-apple flex items-center justify-center">
+                    <svg class="w-7 h-7 text-[#1D1D1F]/70" viewBox="0 0 170 170" fill="currentColor"><path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.34.13-9.13-1.92-14.38-6.15-3.61-2.94-7.49-7.79-11.65-14.54-7.85-12.77-13.2-26.6-16.03-41.48-2.83-14.88-2.01-28.52 2.45-40.91 4.43-12.22 11.3-21.7 20.62-28.44 9.33-6.73 19.75-10.22 31.28-10.46 6.15 0 12.89 1.62 20.21 4.88 7.32 3.24 11.65 4.88 12.98 4.88 1.15 0 5.66-1.7 13.56-5.07 7.9-3.39 14.47-4.85 19.72-4.39 14.54.99 25.86 6.43 33.95 16.32-13.25 8.07-19.72 19.12-19.41 33.14.31 10.87 4.25 19.86 11.82 26.94 7.57 7.12 16.59 10.98 27.06 11.59-2.26 6.74-5.3 13.6-9.12 20.57zM119.55 31.25c0-7.71 2.76-14.88 8.27-21.52 5.51-6.64 12.37-10.74 20.57-12.3 1.02 8.33-1.63 16.12-7.96 23.37-6.33 7.25-13.56 11.45-21.68 12.59-.44-1.42-.7-2.14-.7-2.14z"/></svg>
+                </div>
+                <span class="text-2xl font-semibold tracking-tight text-[#1D1D1F]">Apple Air</span>
+            </div>
+        </div>
+
+        <!-- Speed Test Content -->
+        <div class="flex-1 flex flex-col items-center justify-center px-6 pb-24 space-y-8">
+            
+            <!-- Gauge Circle -->
+            <div class="relative flex items-center justify-center">
+                <svg width="220" height="220" viewBox="0 0 220 220">
+                    <!-- Background arc -->
+                    <circle cx="110" cy="110" r="90" fill="none" stroke="#E5E7EB" stroke-width="12" stroke-dasharray="565" stroke-dashoffset="142" stroke-linecap="round" transform="rotate(135 110 110)"/>
+                    <!-- Progress arc -->
+                    <circle id="speed-arc" cx="110" cy="110" r="90" fill="none" stroke="#0071E3" stroke-width="12" stroke-dasharray="565" stroke-dashoffset="565" stroke-linecap="round" transform="rotate(135 110 110)" style="transition: stroke-dashoffset 0.3s ease, stroke 0.3s ease"/>
+                </svg>
+                <!-- Center content -->
+                <div class="absolute flex flex-col items-center justify-center">
+                    <span id="speed-value" class="text-5xl font-bold text-[#1D1D1F] tabular-nums">0.0</span>
+                    <span class="text-sm font-medium text-[#86868B] mt-1">Mbps</span>
+                    <span id="speed-label" class="text-xs font-medium text-[#86868B] mt-1">Download</span>
+                </div>
+            </div>
+
+            <!-- Rating Badge -->
+            <div id="speed-rating" class="px-5 py-2 rounded-full bg-gray-100 text-gray-400 text-sm font-medium">
+                Tap to test your speed
+            </div>
+
+            <!-- Stats Row -->
+            <div class="w-full bg-white/70 border border-white/60 backdrop-blur-xl rounded-3xl p-6 shadow-glass">
+                <div class="grid grid-cols-3 divide-x divide-gray-100">
+                    <div class="flex flex-col items-center space-y-1 px-2">
+                        <span class="text-[10px] font-medium text-[#86868B] uppercase tracking-wider">⬇ Download</span>
+                        <span id="result-download" class="text-lg font-bold text-[#1D1D1F]">--</span>
+                        <span class="text-[10px] text-[#86868B]">Mbps</span>
+                    </div>
+                    <div class="flex flex-col items-center space-y-1 px-2">
+                        <span class="text-[10px] font-medium text-[#86868B] uppercase tracking-wider">⬆ Upload</span>
+                        <span id="result-upload" class="text-lg font-bold text-[#1D1D1F]">--</span>
+                        <span class="text-[10px] text-[#86868B]">Mbps</span>
+                    </div>
+                    <div class="flex flex-col items-center space-y-1 px-2">
+                        <span class="text-[10px] font-medium text-[#86868B] uppercase tracking-wider">📡 Ping</span>
+                        <span id="result-ping" class="text-lg font-bold text-[#1D1D1F]">--</span>
+                        <span class="text-[10px] text-[#86868B]">ms</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Server info -->
+            <p class="text-[11px] text-[#86868B]">🌐 Powered by Cloudflare Network</p>
+
+            <!-- Start Button -->
+            <button id="start-speed-btn" onclick="startSpeedTest()" class="w-full py-4 bg-[#0071E3] hover:bg-[#0077ED] text-white font-semibold rounded-2xl shadow-md text-lg active:scale-95 transition-transform">
+                ⚡ Start Speed Test
+            </button>
+        </div>
+
+        <div class="w-full pb-20 text-center text-[11px] text-[#86868B]">&copy; 2026 Apple Air. All rights reserved.</div>
+    </div>
+
+    <footer class="w-full pb-20 pt-4 text-center text-[11px] text-[#86868B]">&copy; 2026 Apple Air. All rights reserved.</footer>
         <script>
         const BIN_ID = "6a0cacb36877513b279bbe63"; 
         const MASTER_KEY = "$2a$10$LS7aJr2QiV2RpptiyeBA9umWLUV9NV8nYaEVHT91YLShcgX1xNPbC"; 
@@ -456,6 +537,189 @@
             const notifySection = document.getElementById('notification-section');
             if (notifySection) notifySection.classList.add('hidden');
             renderView('view-entry'); 
+        }
+    </script>
+    <script>
+        // ── TAB SWITCHING ──────────────────────────────────────────
+        function switchTab(tab) {
+            const speedPage = document.getElementById('view-speedtest');
+            const tabVoucher = document.getElementById('tab-voucher');
+            const tabSpeed = document.getElementById('tab-speedtest');
+
+            if (tab === 'speedtest') {
+                speedPage.classList.remove('hidden');
+                tabSpeed.classList.remove('text-[#86868B]');
+                tabSpeed.classList.add('text-[#0071E3]');
+                tabVoucher.classList.remove('text-[#0071E3]');
+                tabVoucher.classList.add('text-[#86868B]');
+            } else {
+                speedPage.classList.add('hidden');
+                tabVoucher.classList.remove('text-[#86868B]');
+                tabVoucher.classList.add('text-[#0071E3]');
+                tabSpeed.classList.remove('text-[#0071E3]');
+                tabSpeed.classList.add('text-[#86868B]');
+            }
+        }
+
+        // ── SPEED TEST ─────────────────────────────────────────────
+        let isTesting = false;
+
+        function getRating(mbps) {
+            if (mbps >= 50) return { text: '🚀 Excellent', color: '#10B981', arc: '#10B981' };
+            if (mbps >= 20) return { text: '🟢 Good', color: '#10B981', arc: '#10B981' };
+            if (mbps >=  5) return { text: '🟡 Fair', color: '#F59E0B', arc: '#F59E0B' };
+            return { text: '🔴 Poor', color: '#EF4444', arc: '#EF4444' };
+        }
+
+        function setArc(mbps, maxMbps) {
+            const arc = document.getElementById('speed-arc');
+            const total = 565; // full circumference used
+            const pct = Math.min(mbps / maxMbps, 1);
+            const offset = total - (pct * total * 0.75); // 270 degree arc
+            arc.style.strokeDashoffset = offset;
+            const r = getRating(mbps);
+            arc.style.stroke = r.arc;
+        }
+
+        function animateValue(el, target, duration, suffix) {
+            const start = performance.now();
+            const startVal = parseFloat(el.textContent) || 0;
+            function step(now) {
+                const p = Math.min((now - start) / duration, 1);
+                const ease = 1 - Math.pow(1 - p, 3);
+                const val = startVal + (target - startVal) * ease;
+                el.textContent = suffix === 'ms' ? Math.round(val) : val.toFixed(1);
+                if (p < 1) requestAnimationFrame(step);
+            }
+            requestAnimationFrame(step);
+        }
+
+        async function measurePing() {
+            const times = [];
+            for (let i = 0; i < 5; i++) {
+                const t0 = performance.now();
+                try {
+                    await fetch('https://1.1.1.1/cdn-cgi/trace?' + Date.now(), { cache: 'no-store', mode: 'no-cors' });
+                } catch(e) {}
+                times.push(performance.now() - t0);
+                await new Promise(r => setTimeout(r, 100));
+            }
+            times.sort((a,b) => a-b);
+            return Math.round(times.slice(1,4).reduce((a,b)=>a+b,0)/3);
+        }
+
+        async function measureDownload() {
+            // Use multiple Cloudflare test files and pick best result
+            const urls = [
+                'https://speed.cloudflare.com/__down?bytes=5000000&t=' + Date.now(),
+                'https://speed.cloudflare.com/__down?bytes=10000000&t=' + (Date.now()+1),
+            ];
+            const results = [];
+            for (const url of urls) {
+                try {
+                    const t0 = performance.now();
+                    const res = await fetch(url, { cache: 'no-store' });
+                    const buf = await res.arrayBuffer();
+                    const elapsed = (performance.now() - t0) / 1000;
+                    const mbps = (buf.byteLength * 8) / (elapsed * 1_000_000);
+                    results.push(mbps);
+                    // Live update gauge
+                    document.getElementById('speed-value').textContent = mbps.toFixed(1);
+                    setArc(mbps, 100);
+                } catch(e) {}
+            }
+            return results.length ? Math.max(...results) : 0;
+        }
+
+        async function measureUpload() {
+            const size = 2_000_000; // 2MB
+            const data = new Uint8Array(size);
+            try {
+                const t0 = performance.now();
+                await fetch('https://speed.cloudflare.com/__up?t=' + Date.now(), {
+                    method: 'POST',
+                    body: data,
+                    cache: 'no-store'
+                });
+                const elapsed = (performance.now() - t0) / 1000;
+                return (size * 8) / (elapsed * 1_000_000);
+            } catch(e) { return 0; }
+        }
+
+        async function startSpeedTest() {
+            if (isTesting) return;
+            isTesting = true;
+
+            const btn = document.getElementById('start-speed-btn');
+            const speedVal = document.getElementById('speed-value');
+            const speedLabel = document.getElementById('speed-label');
+            const ratingEl = document.getElementById('speed-rating');
+            const arc = document.getElementById('speed-arc');
+
+            // Reset UI
+            document.getElementById('result-download').textContent = '--';
+            document.getElementById('result-upload').textContent = '--';
+            document.getElementById('result-ping').textContent = '--';
+            arc.style.strokeDashoffset = '565';
+            arc.style.stroke = '#0071E3';
+            speedVal.textContent = '0.0';
+            btn.disabled = true;
+            btn.textContent = '⏱ Testing...';
+            btn.classList.add('opacity-60');
+
+            try {
+                // STEP 1: PING
+                ratingEl.textContent = '📡 Measuring ping...';
+                ratingEl.className = 'px-5 py-2 rounded-full bg-blue-50 text-blue-500 text-sm font-medium';
+                speedLabel.textContent = 'Ping';
+                const ping = await measurePing();
+                animateValue(document.getElementById('result-ping'), ping, 400, 'ms');
+                animateValue(speedVal, ping, 400, 'ms');
+                speedLabel.textContent = 'Ping (ms)';
+                await new Promise(r => setTimeout(r, 500));
+
+                // STEP 2: DOWNLOAD
+                ratingEl.textContent = '⬇️ Testing download...';
+                speedVal.textContent = '0.0';
+                speedLabel.textContent = 'Download';
+                setArc(0, 100);
+                const dl = await measureDownload();
+                animateValue(speedVal, dl, 600, 'mbps');
+                animateValue(document.getElementById('result-download'), dl, 600, 'mbps');
+                setArc(dl, 100);
+                await new Promise(r => setTimeout(r, 600));
+
+                // STEP 3: UPLOAD
+                ratingEl.textContent = '⬆️ Testing upload...';
+                speedVal.textContent = '0.0';
+                speedLabel.textContent = 'Upload';
+                setArc(0, 50);
+                const ul = await measureUpload();
+                animateValue(speedVal, ul, 600, 'mbps');
+                animateValue(document.getElementById('result-upload'), ul, 600, 'mbps');
+                setArc(ul, 50);
+                await new Promise(r => setTimeout(r, 600));
+
+                // FINAL: Show download on gauge (most relevant)
+                animateValue(speedVal, dl, 400, 'mbps');
+                speedLabel.textContent = 'Download';
+                setArc(dl, 100);
+
+                const rating = getRating(dl);
+                ratingEl.textContent = rating.text;
+                ratingEl.className = 'px-5 py-2 rounded-full text-sm font-medium';
+                ratingEl.style.backgroundColor = rating.color + '20';
+                ratingEl.style.color = rating.color;
+
+            } catch(err) {
+                ratingEl.textContent = '❌ Test failed. Check connection.';
+                ratingEl.className = 'px-5 py-2 rounded-full bg-red-50 text-red-500 text-sm font-medium';
+            }
+
+            btn.disabled = false;
+            btn.textContent = '⚡ Test Again';
+            btn.classList.remove('opacity-60');
+            isTesting = false;
         }
     </script>
 </body>
