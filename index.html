@@ -52,6 +52,14 @@
                 <input type="text" id="voucher-input" placeholder="e.g. 123456" autocomplete="off" class="w-full px-5 py-4 bg-white/50 border border-gray-200 rounded-2xl text-base font-medium text-center uppercase focus:outline-none focus:border-blue-500 focus:bg-white shadow-inner">
                 <button onclick="streamLiveVerification()" class="w-full py-4 bg-[#0071E3] hover:bg-[#0077ED] text-white font-medium rounded-2xl shadow-md">Check Validity</button>
             </div>
+            <!-- Install App Button -->
+            <div id="install-container" class="hidden">
+                <button onclick="installApp()" class="w-full py-3 px-4 rounded-xl bg-gray-50 border border-gray-200 text-gray-700 font-medium flex items-center justify-center space-x-2 active:scale-95 transition-transform">
+                    <span>📲</span>
+                    <span>Install Apple Air App</span>
+                </button>
+                <p class="text-[11px] text-center text-[#86868B] mt-1.5">Add to Home Screen for quick access</p>
+            </div>
         </div>
 
         <div id="view-dashboard" class="w-full bg-white/70 border border-white/60 backdrop-blur-xl rounded-3xl p-8 shadow-glass space-y-6 hidden transform translate-y-4 opacity-0 transition-all duration-300">
@@ -80,6 +88,22 @@
                 <div class="flex justify-between items-center px-5 py-4">
                     <span class="text-sm font-medium text-[#86868B]">Days Remaining</span>
                     <span id="dash-speed" class="text-sm font-medium px-3 py-1 rounded-md">--</span>
+                </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div id="progress-section" class="hidden space-y-2">
+                <div class="flex justify-between items-center px-1">
+                    <span class="text-xs font-medium text-[#86868B]">Voucher Usage</span>
+                    <span id="progress-label" class="text-xs font-semibold text-gray-700">Day 0 of 30</span>
+                </div>
+                <div class="w-full h-3 bg-gray-100 rounded-full overflow-hidden shadow-inner">
+                    <div id="progress-bar" class="h-full rounded-full transition-all duration-700 ease-out" style="width:0%"></div>
+                </div>
+                <div class="flex justify-between px-1">
+                    <span class="text-[10px] text-[#86868B]">Start</span>
+                    <span id="progress-pct" class="text-[10px] font-semibold text-gray-500">0% used</span>
+                    <span class="text-[10px] text-[#86868B]">Expiry</span>
                 </div>
             </div>
 
@@ -520,6 +544,7 @@
                 speedBadge.className = "text-sm font-medium bg-blue-50 text-blue-600 px-3 py-1 rounded-md";
 
                 setupNotification(foundVoucher.expiryText, foundVoucher.code);
+                updateProgressBar(foundVoucher.startTime, foundVoucher.expiryText);
                 renderView('view-dashboard');
 
             } catch (err) {
@@ -540,6 +565,65 @@
         }
     </script>
     <script>
+        // ── PWA INSTALL ────────────────────────────────────────────
+        let deferredPrompt = null;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('install-container').classList.remove('hidden');
+        });
+        window.addEventListener('appinstalled', () => {
+            document.getElementById('install-container').classList.add('hidden');
+            deferredPrompt = null;
+        });
+        async function installApp() {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                document.getElementById('install-container').classList.add('hidden');
+            }
+            deferredPrompt = null;
+        }
+
+        // ── PROGRESS BAR ───────────────────────────────────────────
+        function updateProgressBar(startTimeStr, expiryTimeStr) {
+            const section = document.getElementById('progress-section');
+            const bar = document.getElementById('progress-bar');
+            const label = document.getElementById('progress-label');
+            const pct = document.getElementById('progress-pct');
+
+            const start = parseSheetDateString(startTimeStr);
+            const expiry = parseSheetDateString(expiryTimeStr);
+            if (!start || !expiry || isNaN(start) || isNaN(expiry)) return;
+
+            const now = new Date();
+            const totalMs = expiry - start;
+            const usedMs = now - start;
+            const percent = Math.min(Math.max((usedMs / totalMs) * 100, 0), 100);
+
+            const totalDays = Math.round(totalMs / (1000 * 60 * 60 * 24));
+            const usedDays = Math.round(usedMs / (1000 * 60 * 60 * 24));
+
+            // Gradient color: green→yellow→red
+            let color;
+            if (percent < 40) {
+                color = 'linear-gradient(90deg, #10B981, #34D399)';
+            } else if (percent < 70) {
+                color = 'linear-gradient(90deg, #10B981, #F59E0B)';
+            } else {
+                color = 'linear-gradient(90deg, #F59E0B, #EF4444)';
+            }
+
+            section.classList.remove('hidden');
+            setTimeout(() => {
+                bar.style.width = percent.toFixed(1) + '%';
+                bar.style.background = color;
+            }, 100);
+            label.textContent = `Day ${usedDays} of ${totalDays}`;
+            pct.textContent = `${Math.round(percent)}% used`;
+        }
+
         // ── TAB SWITCHING ──────────────────────────────────────────
         function switchTab(tab) {
             const speedPage = document.getElementById('view-speedtest');
@@ -596,54 +680,70 @@
 
         async function measurePing() {
             const times = [];
-            for (let i = 0; i < 5; i++) {
+            for (let i = 0; i < 10; i++) {
                 const t0 = performance.now();
                 try {
                     await fetch('https://1.1.1.1/cdn-cgi/trace?' + Date.now(), { cache: 'no-store', mode: 'no-cors' });
                 } catch(e) {}
                 times.push(performance.now() - t0);
-                await new Promise(r => setTimeout(r, 100));
+                await new Promise(r => setTimeout(r, 150));
             }
+            // Remove highest and lowest, average the rest
             times.sort((a,b) => a-b);
-            return Math.round(times.slice(1,4).reduce((a,b)=>a+b,0)/3);
+            const trimmed = times.slice(2, 8);
+            return Math.round(trimmed.reduce((a,b)=>a+b,0)/trimmed.length);
         }
 
         async function measureDownload() {
-            // Use multiple Cloudflare test files and pick best result
-            const urls = [
-                'https://speed.cloudflare.com/__down?bytes=5000000&t=' + Date.now(),
-                'https://speed.cloudflare.com/__down?bytes=10000000&t=' + (Date.now()+1),
+            // 3 rounds with increasing file sizes for accuracy
+            const tests = [
+                { bytes: 5_000_000,  label: '5MB'  },
+                { bytes: 15_000_000, label: '15MB' },
+                { bytes: 25_000_000, label: '25MB' },
             ];
             const results = [];
-            for (const url of urls) {
+            for (const t of tests) {
                 try {
+                    const url = `https://speed.cloudflare.com/__down?bytes=${t.bytes}&t=${Date.now()}`;
                     const t0 = performance.now();
                     const res = await fetch(url, { cache: 'no-store' });
                     const buf = await res.arrayBuffer();
                     const elapsed = (performance.now() - t0) / 1000;
                     const mbps = (buf.byteLength * 8) / (elapsed * 1_000_000);
                     results.push(mbps);
-                    // Live update gauge
-                    document.getElementById('speed-value').textContent = mbps.toFixed(1);
-                    setArc(mbps, 100);
+                    // Live update gauge with running average
+                    const avg = results.reduce((a,b)=>a+b,0)/results.length;
+                    document.getElementById('speed-value').textContent = avg.toFixed(1);
+                    setArc(avg, 100);
+                    await new Promise(r => setTimeout(r, 300));
                 } catch(e) {}
             }
-            return results.length ? Math.max(...results) : 0;
+            // Return average of best 2 results for accuracy
+            results.sort((a,b)=>b-a);
+            return results.slice(0,2).reduce((a,b)=>a+b,0) / Math.min(results.length, 2);
         }
 
         async function measureUpload() {
-            const size = 2_000_000; // 2MB
-            const data = new Uint8Array(size);
-            try {
-                const t0 = performance.now();
-                await fetch('https://speed.cloudflare.com/__up?t=' + Date.now(), {
-                    method: 'POST',
-                    body: data,
-                    cache: 'no-store'
-                });
-                const elapsed = (performance.now() - t0) / 1000;
-                return (size * 8) / (elapsed * 1_000_000);
-            } catch(e) { return 0; }
+            // 3 rounds upload for accuracy
+            const sizes = [2_000_000, 5_000_000, 8_000_000];
+            const results = [];
+            for (const size of sizes) {
+                const data = new Uint8Array(size);
+                try {
+                    const t0 = performance.now();
+                    await fetch('https://speed.cloudflare.com/__up?t=' + Date.now(), {
+                        method: 'POST', body: data, cache: 'no-store'
+                    });
+                    const elapsed = (performance.now() - t0) / 1000;
+                    const mbps = (size * 8) / (elapsed * 1_000_000);
+                    results.push(mbps);
+                    const avg = results.reduce((a,b)=>a+b,0)/results.length;
+                    document.getElementById('speed-value').textContent = avg.toFixed(1);
+                    await new Promise(r => setTimeout(r, 200));
+                } catch(e) {}
+            }
+            results.sort((a,b)=>b-a);
+            return results.slice(0,2).reduce((a,b)=>a+b,0) / Math.min(results.length, 2);
         }
 
         async function startSpeedTest() {
