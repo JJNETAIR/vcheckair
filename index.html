@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- vcheckair v3.0 - colUser=0,colCode=1,colStart=2,colStatus=3,colExpiry=4 -->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -318,6 +319,8 @@
 
                 const allRows = parseFullCSV(csvText);
                 if (allRows.length < 2) throw new Error('Empty sheet');
+                console.log('v3.0 | Total rows:', allRows.length, '| First row:', allRows[0], '| Second row:', allRows[1]);
+                console.log('Looking for voucher code:', userInput, '| In column index:', 1);
 
                 // Fixed positional columns: A=0 user, B=1 code, C=2 starttime, D=3 status, E=4 Expirationtime
                 const colUser=0, colCode=1, colStart=2, colStatus=3, colExpiry=4;
