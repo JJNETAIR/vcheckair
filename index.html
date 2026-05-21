@@ -60,6 +60,7 @@
                 
                 <h2 id="dash-status-title" class="text-xl font-semibold tracking-tight">Voucher Status</h2>
                 <p id="dash-code-display" class="text-xs font-mono bg-gray-100 text-gray-600 px-3 py-1 rounded-full uppercase tracking-wider">CODE</p>
+                <p id="dash-user-display" class="text-xs font-medium text-[#86868B] flex items-center gap-1"><span>🖥️</span><span id="dash-user-text">--</span></p>
             </div>
 
             <div class="bg-white/50 border border-gray-100 rounded-2xl overflow-hidden divide-y divide-gray-100 shadow-inner">
@@ -318,8 +319,8 @@
                 const allRows = parseFullCSV(csvText);
                 if (allRows.length < 2) throw new Error('Empty sheet');
 
-                // Fixed positional columns: A=0 code, B=1 starttime, C=2 status, D=3 Expirationtime
-                const colCode=0, colStart=1, colStatus=2, colExpiry=3;
+                // Fixed positional columns: A=0 user, B=1 code, C=2 starttime, D=3 status, E=4 Expirationtime
+                const colUser=0, colCode=1, colStart=2, colStatus=3, colExpiry=4;
 
                 let foundVoucher = null;
 
@@ -333,6 +334,7 @@
                     if (cleanedSheetCode.toLowerCase() === userInput) {
                         const clean = s => (s || '').replace(/[\r\n]+/g, ' ').replace(/"+/g, '').trim();
                         foundVoucher = {
+                            user:       clean(columns[colUser]),
                             code:       cleanedSheetCode.toUpperCase(),
                             startTime:  clean(columns[colStart]),
                             status:     clean(columns[colStatus]).toLowerCase(),
@@ -377,6 +379,7 @@
 
                 // Populate voucher code display
                 document.getElementById('dash-code-display').innerText = foundVoucher.code;
+                document.getElementById('dash-user-text').innerText = foundVoucher.user || '--';
 
                 if (isExpired) {
                     document.getElementById('notification-section').classList.add('hidden');
