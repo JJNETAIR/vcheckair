@@ -365,16 +365,20 @@
 
                 if (expiryDate && !isNaN(expiryDate.getTime())) {
                     const timeDiff = expiryDate.getTime() - today.getTime();
-                    const diffInDays = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
-                    if (diffInDays > 1) {
-                        daysRemainingText = `${diffInDays} Days`;
-                    } else if (diffInDays === 1) {
-                        daysRemainingText = `1 Day (Expires Tomorrow)`;
-                    } else if (diffInDays === 0) {
-                        daysRemainingText = `Expires Today`;
-                    } else {
+                    const diffInHours = timeDiff / (1000 * 60 * 60);
+                    const diffInDays = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+                    if (diffInHours <= 0) {
+                        // Already past expiry time
                         daysRemainingText = `Expired`;
                         isExpired = true;
+                    } else if (diffInHours < 24) {
+                        // Less than 24 hours left — expires TODAY
+                        const hoursLeft = Math.ceil(diffInHours);
+                        daysRemainingText = `Expires Today (${hoursLeft}h left)`;
+                    } else if (diffInDays === 1) {
+                        daysRemainingText = `Expires Tomorrow`;
+                    } else {
+                        daysRemainingText = `${diffInDays} Days`;
                     }
                 } else {
                     daysRemainingText = sheetSaysValid ? 'Active' : 'Expired';
