@@ -62,60 +62,72 @@
             </div>
         </div>
 
-        <div id="view-dashboard" class="w-full bg-white/70 border border-white/60 backdrop-blur-xl rounded-3xl p-8 shadow-glass space-y-6 hidden transform translate-y-4 opacity-0 transition-all duration-300">
-            <div class="flex flex-col items-center text-center space-y-2">
-                <div id="status-icon-active" class="hidden w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-500 text-xl font-bold">✓</div>
-                <div id="status-icon-expired" class="hidden w-12 h-12 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-500 text-xl font-bold">✕</div>
-                
-                <h2 id="dash-status-title" class="text-xl font-semibold tracking-tight">Voucher Status</h2>
+        <div id="view-dashboard" class="w-full bg-white/70 border border-white/60 backdrop-blur-xl rounded-3xl p-5 shadow-glass space-y-3 hidden transform translate-y-4 opacity-0 transition-all duration-300">
+            <!-- Compact Header -->
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div id="status-icon-active" class="hidden w-8 h-8 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-500 text-sm font-bold">✓</div>
+                    <div id="status-icon-expired" class="hidden w-8 h-8 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-500 text-sm font-bold">✕</div>
+                    <div>
+                        <h2 id="dash-status-title" class="text-base font-semibold tracking-tight leading-tight">Voucher Status</h2>
+                        <p id="dash-user-display" class="text-[11px] text-[#86868B] flex items-center gap-1"><span>🖥️</span><span id="dash-user-text">--</span></p>
+                    </div>
+                </div>
                 <p id="dash-code-display" class="text-xs font-mono bg-gray-100 text-gray-600 px-3 py-1 rounded-full uppercase tracking-wider">CODE</p>
-                <p id="dash-user-display" class="text-xs font-medium text-[#86868B] flex items-center gap-1"><span>🖥️</span><span id="dash-user-text">--</span></p>
             </div>
 
+            <!-- Compact Info Cards -->
             <div class="bg-white/50 border border-gray-100 rounded-2xl overflow-hidden divide-y divide-gray-100 shadow-inner">
-                <div class="flex justify-between items-center px-5 py-4">
-                    <span class="text-sm font-medium text-[#86868B]">Status</span>
-                    <span id="dash-status-badge" class="text-sm font-semibold px-3 py-1 rounded-full bg-gray-100 text-gray-500">--</span>
+                <div class="flex justify-between items-center px-4 py-2.5">
+                    <span class="text-xs font-medium text-[#86868B]">Status</span>
+                    <span id="dash-status-badge" class="text-xs font-semibold px-3 py-1 rounded-full bg-gray-100 text-gray-500">--</span>
                 </div>
-                <div class="flex justify-between items-center px-5 py-4">
-                    <span class="text-sm font-medium text-[#86868B]">Start Time</span>
-                    <span id="dash-time" class="text-sm font-semibold text-right max-w-[200px] leading-tight text-gray-900">--</span>
+                <div class="flex justify-between items-center px-4 py-2.5">
+                    <span class="text-xs font-medium text-[#86868B]">Start Time</span>
+                    <span id="dash-time" class="text-xs font-semibold text-right max-w-[200px] leading-tight text-gray-900">--</span>
                 </div>
-                <div class="flex justify-between items-center px-5 py-4">
-                    <span class="text-sm font-medium text-[#86868B]">Expiration Time</span>
-                    <span id="dash-data" class="text-sm font-semibold text-right max-w-[200px] leading-tight text-gray-900">--</span>
+                <div class="flex justify-between items-center px-4 py-2.5">
+                    <span class="text-xs font-medium text-[#86868B]">Expiration Time</span>
+                    <span id="dash-data" class="text-xs font-semibold text-right max-w-[200px] leading-tight text-gray-900">--</span>
                 </div>
-                <div class="flex justify-between items-center px-5 py-4">
-                    <span class="text-sm font-medium text-[#86868B]">Days Remaining</span>
-                    <span id="dash-speed" class="text-sm font-medium px-3 py-1 rounded-md">--</span>
+                <div class="flex justify-between items-center px-4 py-2.5">
+                    <span class="text-xs font-medium text-[#86868B]">Days Remaining</span>
+                    <span id="dash-speed" class="text-xs font-medium px-3 py-1 rounded-md">--</span>
+                </div>
+                <!-- Progress Bar INSIDE card -->
+                <div id="progress-section" class="hidden px-4 py-3 space-y-1.5">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] font-medium text-[#86868B]">Voucher Usage</span>
+                        <span id="progress-label" class="text-[10px] font-semibold text-gray-700">Day 0 of 30</span>
+                    </div>
+                    <div class="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden shadow-inner">
+                        <div id="progress-bar" class="h-full rounded-full transition-all duration-700 ease-out" style="width:0%"></div>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-[9px] text-[#86868B]">Start</span>
+                        <span id="progress-pct" class="text-[9px] font-semibold text-gray-500">0% used</span>
+                        <span class="text-[9px] text-[#86868B]">Expiry</span>
+                    </div>
                 </div>
             </div>
 
-            <!-- Progress Bar -->
-            <div id="progress-section" class="hidden space-y-2">
-                <div class="flex justify-between items-center px-1">
-                    <span class="text-xs font-medium text-[#86868B]">Voucher Usage</span>
-                    <span id="progress-label" class="text-xs font-semibold text-gray-700">Day 0 of 30</span>
-                </div>
-                <div class="w-full h-3 bg-gray-100 rounded-full overflow-hidden shadow-inner">
-                    <div id="progress-bar" class="h-full rounded-full transition-all duration-700 ease-out" style="width:0%"></div>
-                </div>
-                <div class="flex justify-between px-1">
-                    <span class="text-[10px] text-[#86868B]">Start</span>
-                    <span id="progress-pct" class="text-[10px] font-semibold text-gray-500">0% used</span>
-                    <span class="text-[10px] text-[#86868B]">Expiry</span>
-                </div>
-            </div>
-
-            <div id="notification-section" class="mt-4 hidden">
-                <button id="notify-me-btn" class="w-full py-3 px-4 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-600 font-medium flex items-center justify-center space-x-2 active:scale-95 transition-transform">
-                    <span>Notify Me 1 Day Before Expiry</span>
-                    <span>🔔</span>
+            <!-- Notify + Check Another side by side -->
+            <div id="notification-section" class="hidden space-y-0">
+                <button id="notify-me-btn" class="w-full py-2.5 px-4 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-600 text-sm font-medium flex items-center justify-center space-x-2 active:scale-95 transition-transform">
+                    <span>🔔</span><span>Notify Me 1 Day Before Expiry</span>
                 </button>
-                <p id="notify-status" class="text-xs text-center mt-1.5 text-gray-400 hidden"></p>
+                <p id="notify-status" class="text-xs text-center mt-1 text-gray-400 hidden"></p>
             </div>
 
-            <button onclick="backToEntryView()" class="w-full py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-2xl">Check Another Voucher</button>
+            <!-- Bottom buttons row -->
+            <div id="bottom-buttons" class="flex gap-2">
+                <div id="notify-placeholder" class="hidden flex-1">
+                    <button id="notify-me-btn-alt" class="w-full py-2.5 px-3 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-600 text-xs font-medium flex items-center justify-center gap-1 active:scale-95 transition-transform">
+                        <span>🔔</span><span>Notify Me</span>
+                    </button>
+                </div>
+                <button onclick="backToEntryView()" class="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-xl">Check Another</button>
+            </div>
         </div>
 
         <div id="view-loading" class="hidden flex flex-col items-center space-y-4">
@@ -190,6 +202,24 @@
                         <span id="result-ping" class="text-lg font-bold text-[#1D1D1F]">--</span>
                         <span class="text-[10px] text-[#86868B]">ms</span>
                     </div>
+                </div>
+            </div>
+
+            <!-- WiFi Signal Card -->
+            <div class="w-full bg-white/70 border border-white/60 backdrop-blur-xl rounded-2xl px-5 py-4 shadow-glass flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div id="wifi-icon" class="text-2xl">📶</div>
+                    <div>
+                        <p class="text-xs font-semibold text-[#1D1D1F]" id="wifi-type">Detecting...</p>
+                        <p class="text-[10px] text-[#86868B]" id="wifi-quality">Checking connection</p>
+                    </div>
+                </div>
+                <!-- Signal Bars -->
+                <div class="flex items-end gap-0.5 h-6">
+                    <div id="bar1" class="w-2 rounded-sm bg-gray-200" style="height:25%"></div>
+                    <div id="bar2" class="w-2 rounded-sm bg-gray-200" style="height:50%"></div>
+                    <div id="bar3" class="w-2 rounded-sm bg-gray-200" style="height:75%"></div>
+                    <div id="bar4" class="w-2 rounded-sm bg-gray-200" style="height:100%"></div>
                 </div>
             </div>
 
@@ -622,6 +652,52 @@
             }, 100);
             label.textContent = `Day ${usedDays} of ${totalDays}`;
             pct.textContent = `${Math.round(percent)}% used`;
+        }
+
+        // ── WIFI SIGNAL DETECTION ──────────────────────────────────
+        function updateWifiSignal() {
+            const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+            const bar1 = document.getElementById('bar1');
+            const bar2 = document.getElementById('bar2');
+            const bar3 = document.getElementById('bar3');
+            const bar4 = document.getElementById('bar4');
+            const wifiType = document.getElementById('wifi-type');
+            const wifiQuality = document.getElementById('wifi-quality');
+            const wifiIcon = document.getElementById('wifi-icon');
+
+            if (!conn) {
+                wifiType.textContent = 'WiFi Connected';
+                wifiQuality.textContent = 'Signal info unavailable';
+                [bar1,bar2,bar3,bar4].forEach(b => b.style.backgroundColor = '#9CA3AF');
+                return;
+            }
+
+            const type = conn.effectiveType || '4g';
+            const downlink = conn.downlink || 10;
+            const rtt = conn.rtt || 50;
+
+            // Determine bars and quality based on downlink speed
+            let bars = 1, quality = '', color = '#EF4444', icon = '📶';
+            if (downlink >= 30) { bars = 4; quality = 'Excellent Signal'; color = '#10B981'; icon = '📶'; }
+            else if (downlink >= 15) { bars = 3; quality = 'Good Signal'; color = '#10B981'; icon = '📶'; }
+            else if (downlink >= 5)  { bars = 2; quality = 'Fair Signal'; color = '#F59E0B'; icon = '📶'; }
+            else                     { bars = 1; quality = 'Weak Signal'; color = '#EF4444'; icon = '📶'; }
+
+            const typeLabel = type === '4g' ? 'WiFi / 4G' : type === '3g' ? '3G Network' : type === '2g' ? '2G Network' : 'WiFi';
+            wifiType.textContent = typeLabel;
+            wifiQuality.textContent = `${quality} • ~${downlink} Mbps • ${rtt}ms`;
+            wifiIcon.textContent = icon;
+
+            const allBars = [bar1, bar2, bar3, bar4];
+            allBars.forEach((b, i) => {
+                b.style.backgroundColor = i < bars ? color : '#E5E7EB';
+            });
+        }
+
+        // Run on load and when tab switches to speed test
+        updateWifiSignal();
+        if (navigator.connection) {
+            navigator.connection.addEventListener('change', updateWifiSignal);
         }
 
         // ── TAB SWITCHING ──────────────────────────────────────────
