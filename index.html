@@ -206,6 +206,17 @@
                 </div>
             </div>
 
+            <!-- Test History -->
+            <div id="history-section" class="w-full hidden">
+                <div class="bg-white/70 border border-white/60 backdrop-blur-xl rounded-2xl overflow-hidden shadow-glass">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
+                        <span class="text-xs font-semibold text-[#1D1D1F]">⚡ Recent Tests</span>
+                        <button onclick="clearHistory()" class="text-[10px] text-rose-400 font-medium">Clear</button>
+                    </div>
+                    <div id="history-list" class="divide-y divide-gray-50"></div>
+                </div>
+            </div>
+
             <!-- Signal Bars only - compact -->
             <div class="flex items-center justify-center gap-3">
                 <span class="text-[11px] text-[#86868B]" id="wifi-quality">Checking signal...</span>
@@ -647,6 +658,92 @@
             pct.textContent = `${Math.round(percent)}% used`;
         }
 
+        // ── SPEED TEST HISTORY (IndexedDB) ────────────────────────
+        const DB_NAME = 'appleair_speed';
+        const DB_STORE = 'history';
+
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(DB_NAME, 1);
+                req.onupgradeneeded = e => {
+                    e.target.result.createObjectStore(DB_STORE, { keyPath: 'id', autoIncrement: true });
+                };
+                req.onsuccess = e => resolve(e.target.result);
+                req.onerror = () => reject();
+            });
+        }
+
+        async function saveHistory(dl, ul, ping) {
+            try {
+                const db = await openDB();
+                const tx = db.transaction(DB_STORE, 'readwrite');
+                const store = tx.objectStore(DB_STORE);
+                store.add({ dl, ul, ping, ts: Date.now() });
+                // Keep only last 5
+                const all = await new Promise(r => { const req = store.getAll(); req.onsuccess = () => r(req.result); });
+                if (all.length > 5) store.delete(all[0].id);
+                tx.oncomplete = () => db.close();
+            } catch(e) {}
+        }
+
+        async function loadHistory() {
+            try {
+                const db = await openDB();
+                const tx = db.transaction(DB_STORE, 'readonly');
+                const store = tx.objectStore(DB_STORE);
+                const all = await new Promise(r => { const req = store.getAll(); req.onsuccess = () => r(req.result); });
+                db.close();
+                return all.reverse(); // newest first
+            } catch(e) { return []; }
+        }
+
+        async function clearHistory() {
+            try {
+                const db = await openDB();
+                const tx = db.transaction(DB_STORE, 'readwrite');
+                tx.objectStore(DB_STORE).clear();
+                tx.oncomplete = () => { db.close(); renderHistory(); };
+            } catch(e) {}
+        }
+
+        function formatHistoryTime(ts) {
+            const now = new Date();
+            const d = new Date(ts);
+            const diff = Math.floor((now - d) / 86400000);
+            const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            if (diff === 0) return `Today ${time}`;
+            if (diff === 1) return `Yesterday ${time}`;
+            return `${diff} days ago ${time}`;
+        }
+
+        async function renderHistory() {
+            const list = document.getElementById('history-list');
+            const section = document.getElementById('history-section');
+            if (!list) return;
+            const items = await loadHistory();
+            if (!items.length) { section.classList.add('hidden'); return; }
+            section.classList.remove('hidden');
+            list.innerHTML = items.map(item => `
+                <div class="flex items-center justify-between px-4 py-2.5">
+                    <div class="flex items-center gap-3">
+                        <div class="flex flex-col gap-0.5">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] text-[#86868B]">⬇</span>
+                                <span class="text-sm font-bold text-[#1D1D1F]">${item.dl.toFixed(1)}</span>
+                                <span class="text-[10px] text-[#86868B]">Mbps</span>
+                                <span class="text-[10px] text-[#86868B] ml-1">⬆ ${item.ul.toFixed(1)}</span>
+                                <span class="text-[10px] text-[#86868B]">📡 ${item.ping}ms</span>
+                            </div>
+                        </div>
+                    </div>
+                    <span class="text-[10px] text-[#86868B] text-right">${formatHistoryTime(item.ts)}</span>
+                </div>
+            `).join('');
+        }
+
+        // Load history when speed test tab opens
+        document.addEventListener('DOMContentLoaded', renderHistory);
+
         // ── WIFI SIGNAL DETECTION ──────────────────────────────────
         function updateWifiSignal(overrideMbps) {
             const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
@@ -693,6 +790,7 @@
                 tabSpeed.classList.add('text-[#0071E3]');
                 tabVoucher.classList.remove('text-[#0071E3]');
                 tabVoucher.classList.add('text-[#86868B]');
+                renderHistory();
             } else {
                 speedPage.classList.add('hidden');
                 tabVoucher.classList.remove('text-[#86868B]');
@@ -868,6 +966,8 @@
                 speedLabel.textContent = 'Download';
                 setArc(dl, 100);
                 updateWifiSignal(dl); // update bars with real measured speed
+                await saveHistory(dl, ul, ping);
+                await renderHistory();
 
                 const rating = getRating(dl);
                 ratingEl.textContent = rating.text;
