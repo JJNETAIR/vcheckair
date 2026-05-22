@@ -661,8 +661,9 @@
             const downlink = overrideMbps || (conn ? conn.downlink : null) || 0;
 
             let bars = 1, quality = '', color = '#EF4444';
-            if (downlink >= 30)      { bars = 4; quality = '📶 Excellent Signal'; color = '#10B981'; }
-            else if (downlink >= 15) { bars = 3; quality = '📶 Good Signal';      color = '#10B981'; }
+            if (downlink >= 100)     { bars = 4; quality = '📶 Excellent Signal'; color = '#10B981'; }
+            else if (downlink >= 50) { bars = 4; quality = '📶 Excellent Signal'; color = '#10B981'; }
+            else if (downlink >= 20) { bars = 3; quality = '📶 Good Signal';      color = '#10B981'; }
             else if (downlink >= 5)  { bars = 2; quality = '📶 Fair Signal';      color = '#F59E0B'; }
             else if (downlink > 0)   { bars = 1; quality = '📶 Weak Signal';      color = '#EF4444'; }
             else                     { bars = 0; quality = 'Checking signal...';  color = '#9CA3AF'; }
@@ -705,13 +706,15 @@
         let isTesting = false;
 
         function getRating(mbps) {
-            if (mbps >= 50) return { text: '🚀 Excellent', color: '#10B981', arc: '#10B981' };
-            if (mbps >= 20) return { text: '🟢 Good', color: '#10B981', arc: '#10B981' };
-            if (mbps >=  5) return { text: '🟡 Fair', color: '#F59E0B', arc: '#F59E0B' };
-            return { text: '🔴 Poor', color: '#EF4444', arc: '#EF4444' };
+            if (mbps >= 200) return { text: '🚀 Ultra Fast',  color: '#10B981', arc: '#10B981' };
+            if (mbps >= 100) return { text: '🚀 Excellent',   color: '#10B981', arc: '#10B981' };
+            if (mbps >=  50) return { text: '🟢 Very Good',   color: '#10B981', arc: '#10B981' };
+            if (mbps >=  20) return { text: '🟢 Good',        color: '#10B981', arc: '#10B981' };
+            if (mbps >=   5) return { text: '🟡 Fair',        color: '#F59E0B', arc: '#F59E0B' };
+            return                   { text: '🔴 Poor',        color: '#EF4444', arc: '#EF4444' };
         }
 
-        function setArc(mbps, maxMbps) {
+        function setArc(mbps, maxMbps = 600) {
             const arc = document.getElementById('speed-arc');
             const total = 565; // full circumference used
             const pct = Math.min(mbps / maxMbps, 1);
@@ -751,55 +754,73 @@
         }
 
         async function measureDownload() {
-            // 3 rounds with increasing file sizes for accuracy
-            const tests = [
-                { bytes: 5_000_000,  label: '5MB'  },
-                { bytes: 15_000_000, label: '15MB' },
-                { bytes: 25_000_000, label: '25MB' },
+            // PARALLEL connections like Ookla - saturates full bandwidth
+            // Round 1: 4 parallel x 5MB
+            // Round 2: 8 parallel x 10MB
+            // Round 3: 8 parallel x 25MB
+            const rounds = [
+                { connections: 4,  bytes: 5_000_000  },
+                { connections: 8,  bytes: 10_000_000 },
+                { connections: 8,  bytes: 25_000_000 },
             ];
-            const results = [];
-            for (const t of tests) {
-                try {
-                    const url = `https://speed.cloudflare.com/__down?bytes=${t.bytes}&t=${Date.now()}`;
-                    const t0 = performance.now();
-                    const res = await fetch(url, { cache: 'no-store' });
-                    const buf = await res.arrayBuffer();
-                    const elapsed = (performance.now() - t0) / 1000;
-                    const mbps = (buf.byteLength * 8) / (elapsed * 1_000_000);
-                    results.push(mbps);
-                    // Live update gauge with running average
-                    const avg = results.reduce((a,b)=>a+b,0)/results.length;
-                    document.getElementById('speed-value').textContent = avg.toFixed(1);
-                    setArc(avg, 100);
-                    await new Promise(r => setTimeout(r, 300));
-                } catch(e) {}
-            }
-            // Return average of best 2 results for accuracy
-            results.sort((a,b)=>b-a);
-            return results.slice(0,2).reduce((a,b)=>a+b,0) / Math.min(results.length, 2);
-        }
+            const roundResults = [];
 
-        async function measureUpload() {
-            // 3 rounds upload for accuracy
-            const sizes = [2_000_000, 5_000_000, 8_000_000];
-            const results = [];
-            for (const size of sizes) {
-                const data = new Uint8Array(size);
+            for (const round of rounds) {
                 try {
                     const t0 = performance.now();
-                    await fetch('https://speed.cloudflare.com/__up?t=' + Date.now(), {
-                        method: 'POST', body: data, cache: 'no-store'
-                    });
+                    // Fire all connections simultaneously
+                    const fetches = Array.from({ length: round.connections }, (_, i) =>
+                        fetch(`https://speed.cloudflare.com/__down?bytes=${round.bytes}&t=${Date.now()}_${i}`, { cache: 'no-store' })
+                            .then(r => r.arrayBuffer())
+                    );
+                    const buffers = await Promise.all(fetches);
                     const elapsed = (performance.now() - t0) / 1000;
-                    const mbps = (size * 8) / (elapsed * 1_000_000);
-                    results.push(mbps);
-                    const avg = results.reduce((a,b)=>a+b,0)/results.length;
-                    document.getElementById('speed-value').textContent = avg.toFixed(1);
+                    const totalBytes = buffers.reduce((sum, b) => sum + b.byteLength, 0);
+                    const mbps = (totalBytes * 8) / (elapsed * 1_000_000);
+                    roundResults.push(mbps);
+
+                    // Live update gauge
+                    const best = Math.max(...roundResults);
+                    document.getElementById('speed-value').textContent = best.toFixed(1);
+                    setArc(best, 600);
                     await new Promise(r => setTimeout(r, 200));
                 } catch(e) {}
             }
-            results.sort((a,b)=>b-a);
-            return results.slice(0,2).reduce((a,b)=>a+b,0) / Math.min(results.length, 2);
+            // Return best round result (like Ookla uses peak)
+            return roundResults.length ? Math.max(...roundResults) : 0;
+        }
+
+        async function measureUpload() {
+            // PARALLEL upload connections
+            const rounds = [
+                { connections: 4, size: 2_000_000 },
+                { connections: 6, size: 4_000_000 },
+                { connections: 8, size: 6_000_000 },
+            ];
+            const roundResults = [];
+
+            for (const round of rounds) {
+                try {
+                    const t0 = performance.now();
+                    const fetches = Array.from({ length: round.connections }, (_, i) => {
+                        const data = new Uint8Array(round.size);
+                        return fetch(`https://speed.cloudflare.com/__up?t=${Date.now()}_${i}`, {
+                            method: 'POST', body: data, cache: 'no-store'
+                        });
+                    });
+                    await Promise.all(fetches);
+                    const elapsed = (performance.now() - t0) / 1000;
+                    const totalBytes = round.connections * round.size;
+                    const mbps = (totalBytes * 8) / (elapsed * 1_000_000);
+                    roundResults.push(mbps);
+
+                    // Live update
+                    const best = Math.max(...roundResults);
+                    document.getElementById('speed-value').textContent = best.toFixed(1);
+                    await new Promise(r => setTimeout(r, 200));
+                } catch(e) {}
+            }
+            return roundResults.length ? Math.max(...roundResults) : 0;
         }
 
         async function startSpeedTest() {
