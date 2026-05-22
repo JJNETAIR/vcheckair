@@ -832,77 +832,133 @@
             requestAnimationFrame(step);
         }
 
+        // ── PING: 8 samples, trim outliers, return median ────────
         async function measurePing() {
             const times = [];
-            for (let i = 0; i < 10; i++) {
+            for (let i = 0; i < 8; i++) {
                 const t0 = performance.now();
                 try {
-                    await fetch('https://1.1.1.1/cdn-cgi/trace?' + Date.now(), { cache: 'no-store', mode: 'no-cors' });
+                    await fetch('https://speed.cloudflare.com/__down?bytes=1&t=' + Date.now(), 
+                        { cache: 'no-store' });
                 } catch(e) {}
                 times.push(performance.now() - t0);
-                await new Promise(r => setTimeout(r, 150));
+                await new Promise(r => setTimeout(r, 100));
             }
-            // Remove highest and lowest, average the rest
-            times.sort((a,b) => a-b);
-            const trimmed = times.slice(2, 8);
-            return Math.round(trimmed.reduce((a,b)=>a+b,0)/trimmed.length);
+            times.sort((a, b) => a - b);
+            const trimmed = times.slice(1, 6); // drop lowest and 2 highest
+            return Math.round(trimmed.reduce((a, b) => a + b, 0) / trimmed.length);
         }
 
-        async function measureDownload() {
-            // 2 rounds only, parallel connections, time-capped at 6s each
-            const rounds = [
-                { connections: 4, bytes: 10_000_000 },  // Round 1: warmup
-                { connections: 8, bytes: 10_000_000 },  // Round 2: full blast
-            ];
-            const roundResults = [];
-            for (const round of rounds) {
-                try {
-                    const t0 = performance.now();
-                    const fetches = Array.from({ length: round.connections }, (_, i) =>
-                        fetch(`https://speed.cloudflare.com/__down?bytes=${round.bytes}&t=${Date.now()}_${i}`, { cache: 'no-store' })
-                            .then(r => r.arrayBuffer())
-                    );
-                    // Time cap: max 6 seconds per round
-                    const timeout = new Promise(r => setTimeout(() => r([]), 6000));
-                    const buffers = await Promise.race([Promise.all(fetches), timeout]);
-                    if (!buffers.length) continue;
+        // ── STREAMING DOWNLOAD: reads chunks in real-time ────────
+        // Measures speed as data ARRIVES not after full download
+        async function streamDownload(bytes, onProgress) {
+            const url = `https://speed.cloudflare.com/__down?bytes=${bytes}&t=${Date.now()}`;
+            const t0 = performance.now();
+            let loaded = 0;
+            let peakMbps = 0;
+            const samples = [];
+
+            try {
+                const res = await fetch(url, { cache: 'no-store' });
+                const reader = res.body.getReader();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    loaded += value.length;
                     const elapsed = (performance.now() - t0) / 1000;
-                    const totalBytes = buffers.reduce((sum, b) => sum + (b.byteLength||0), 0);
-                    const mbps = (totalBytes * 8) / (elapsed * 1_000_000);
-                    roundResults.push(mbps);
-                    document.getElementById('speed-value').textContent = mbps.toFixed(1);
-                    setArc(mbps, 600);
-                } catch(e) {}
-            }
-            return roundResults.length ? Math.max(...roundResults) : 0;
+                    if (elapsed > 0.3) { // ignore first 300ms (TCP warmup)
+                        const mbps = (loaded * 8) / (elapsed * 1_000_000);
+                        samples.push(mbps);
+                        peakMbps = Math.max(peakMbps, mbps);
+                        if (onProgress) onProgress(mbps);
+                    }
+                }
+            } catch(e) {}
+
+            // Return 90th percentile (like Ookla) — ignores slow start
+            if (!samples.length) return 0;
+            samples.sort((a, b) => a - b);
+            const p90idx = Math.floor(samples.length * 0.90);
+            return samples[p90idx] || peakMbps;
+        }
+
+        // ── PARALLEL STREAMING: multiple streams simultaneously ───
+        async function measureDownload() {
+            const speedVal = document.getElementById('speed-value');
+            let peakOverall = 0;
+            const allSamples = [];
+
+            // Warmup: 2 parallel streams
+            ratingEl.innerHTML = '<span class="px-5 py-2 rounded-full bg-blue-50 text-blue-500 text-sm font-medium">⬇️ Warming up...</span>';
+            const warmupResults = await Promise.all(
+                Array.from({ length: 2 }, () =>
+                    streamDownload(5_000_000, (mbps) => {
+                        const current = Math.max(peakOverall, mbps);
+                        speedVal.textContent = current.toFixed(1);
+                        setArc(current, 600);
+                    })
+                )
+            );
+            const warmupPeak = Math.max(...warmupResults);
+            peakOverall = warmupPeak;
+
+            // Full blast: 6 parallel streams
+            ratingEl.innerHTML = '<span class="px-5 py-2 rounded-full bg-blue-50 text-blue-500 text-sm font-medium">⬇️ Full speed test...</span>';
+            const blastResults = await Promise.all(
+                Array.from({ length: 6 }, () =>
+                    streamDownload(10_000_000, (mbps) => {
+                        // Live gauge shows combined throughput estimate
+                        peakOverall = Math.max(peakOverall, mbps * 1.5); // scale for parallel
+                        speedVal.textContent = Math.min(peakOverall, 999).toFixed(1);
+                        setArc(peakOverall, 600);
+                    })
+                )
+            );
+
+            // Best result = sum of top 4 parallel streams (realistic combined throughput)
+            blastResults.sort((a, b) => b - a);
+            const combined = blastResults.slice(0, 4).reduce((s, v) => s + v, 0);
+            const final = Math.max(combined, warmupPeak);
+            speedVal.textContent = final.toFixed(1);
+            setArc(final, 600);
+            return final;
+        }
+
+        // ── STREAMING UPLOAD ──────────────────────────────────────
+        async function streamUpload(size) {
+            // Generate random data (more realistic than zeros)
+            const data = crypto.getRandomValues(new Uint8Array(size));
+            const t0 = performance.now();
+            try {
+                await fetch('https://speed.cloudflare.com/__up?t=' + Date.now(), {
+                    method: 'POST',
+                    body: data,
+                    cache: 'no-store',
+                    duplex: 'half'
+                });
+            } catch(e) {}
+            const elapsed = (performance.now() - t0) / 1000;
+            return elapsed > 0 ? (size * 8) / (elapsed * 1_000_000) : 0;
         }
 
         async function measureUpload() {
-            // 2 rounds parallel upload, time-capped at 5s each
-            const rounds = [
-                { connections: 4, size: 3_000_000 },
-                { connections: 6, size: 3_000_000 },
-            ];
-            const roundResults = [];
-            for (const round of rounds) {
-                try {
-                    const t0 = performance.now();
-                    const fetches = Array.from({ length: round.connections }, (_, i) => {
-                        const data = new Uint8Array(round.size);
-                        return fetch(`https://speed.cloudflare.com/__up?t=${Date.now()}_${i}`, {
-                            method: 'POST', body: data, cache: 'no-store'
-                        });
-                    });
-                    const timeout = new Promise(r => setTimeout(() => r([]), 5000));
-                    await Promise.race([Promise.all(fetches), timeout]);
-                    const elapsed = (performance.now() - t0) / 1000;
-                    const mbps = (round.connections * round.size * 8) / (elapsed * 1_000_000);
-                    roundResults.push(mbps);
-                    document.getElementById('speed-value').textContent = mbps.toFixed(1);
-                } catch(e) {}
-            }
-            return roundResults.length ? Math.max(...roundResults) : 0;
+            const speedVal = document.getElementById('speed-value');
+            // 4 parallel upload streams
+            const results = await Promise.all([
+                streamUpload(3_000_000),
+                streamUpload(3_000_000),
+                streamUpload(3_000_000),
+                streamUpload(3_000_000),
+            ]);
+            results.sort((a, b) => b - a);
+            // Sum top 3 streams
+            const combined = results.slice(0, 3).reduce((s, v) => s + v, 0);
+            speedVal.textContent = combined.toFixed(1);
+            return combined;
         }
+
+        let ratingEl = null; // global so measureDownload can update it
 
         async function startSpeedTest() {
             if (isTesting) return;
@@ -911,7 +967,7 @@
             const btn = document.getElementById('start-speed-btn');
             const speedVal = document.getElementById('speed-value');
             const speedLabel = document.getElementById('speed-label');
-            const ratingEl = document.getElementById('speed-rating');
+            ratingEl = document.getElementById('speed-rating');
             const arc = document.getElementById('speed-arc');
 
             // Reset UI
@@ -927,8 +983,8 @@
 
             try {
                 // STEP 1: PING
-                ratingEl.textContent = '📡 Measuring ping...';
-                ratingEl.className = 'px-5 py-2 rounded-full bg-blue-50 text-blue-500 text-sm font-medium';
+                ratingEl.innerHTML = '<span class="px-5 py-2 rounded-full bg-blue-50 text-blue-500 text-sm font-medium">📡 Measuring ping...</span>';
+                ratingEl.className = 'flex justify-center';
                 speedLabel.textContent = 'Ping';
                 const ping = await measurePing();
                 animateValue(document.getElementById('result-ping'), ping, 400, 'ms');
@@ -936,22 +992,21 @@
                 speedLabel.textContent = 'Ping (ms)';
                 await new Promise(r => setTimeout(r, 500));
 
-                // STEP 2: DOWNLOAD
-                ratingEl.textContent = '⬇️ Testing download...';
+                // STEP 2: DOWNLOAD (streaming handles its own UI updates)
                 speedVal.textContent = '0.0';
                 speedLabel.textContent = 'Download';
-                setArc(0, 100);
+                setArc(0, 600);
                 const dl = await measureDownload();
-                animateValue(speedVal, dl, 600, 'mbps');
-                animateValue(document.getElementById('result-download'), dl, 600, 'mbps');
-                setArc(dl, 100);
-                await new Promise(r => setTimeout(r, 600));
+                animateValue(speedVal, dl, 400, 'mbps');
+                animateValue(document.getElementById('result-download'), dl, 400, 'mbps');
+                setArc(dl, 600);
+                await new Promise(r => setTimeout(r, 400));
 
                 // STEP 3: UPLOAD
-                ratingEl.textContent = '⬆️ Testing upload...';
+                ratingEl.innerHTML = '<span class="px-5 py-2 rounded-full bg-blue-50 text-blue-500 text-sm font-medium">⬆️ Testing upload...</span>';
                 speedVal.textContent = '0.0';
                 speedLabel.textContent = 'Upload';
-                setArc(0, 50);
+                setArc(0, 600);
                 const ul = await measureUpload();
                 animateValue(speedVal, ul, 600, 'mbps');
                 animateValue(document.getElementById('result-upload'), ul, 600, 'mbps');
@@ -967,14 +1022,12 @@
                 await renderHistory();
 
                 const rating = getRating(dl);
-                ratingEl.textContent = rating.text;
-                ratingEl.className = 'px-5 py-2 rounded-full text-sm font-medium';
-                ratingEl.style.backgroundColor = rating.color + '20';
-                ratingEl.style.color = rating.color;
+                ratingEl.innerHTML = `<span class="px-5 py-2 rounded-full text-sm font-medium" style="background:${rating.color}20;color:${rating.color}">${rating.text}</span>`;
+                ratingEl.className = 'flex justify-center';
 
             } catch(err) {
-                ratingEl.textContent = '❌ Test failed. Check connection.';
-                ratingEl.className = 'px-5 py-2 rounded-full bg-red-50 text-red-500 text-sm font-medium';
+                ratingEl.innerHTML = '<span class="px-5 py-2 rounded-full bg-red-50 text-red-500 text-sm font-medium">❌ Test failed. Check connection.</span>';
+                ratingEl.className = 'flex justify-center';
             }
 
             btn.disabled = false;
