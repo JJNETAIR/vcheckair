@@ -926,38 +926,41 @@
             return final;
         }
 
-        // ── UPLOAD: Sequential rounds, most compatible method ────
+        // ── UPLOAD: XHR method — most compatible on all Android ──
+        function xhrUpload(size) {
+            return new Promise((resolve) => {
+                const data = new Uint8Array(size).fill(65); // 'A'
+                const xhr = new XMLHttpRequest();
+                const t0 = performance.now();
+                xhr.open('POST', 'https://speed.cloudflare.com/__up?t=' + Date.now(), true);
+                xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+                xhr.onload = xhr.onerror = xhr.ontimeout = () => {
+                    const elapsed = (performance.now() - t0) / 1000;
+                    const mbps = elapsed > 0.1 ? (size * 8) / (elapsed * 1_000_000) : 0;
+                    resolve(mbps);
+                };
+                xhr.timeout = 8000;
+                xhr.send(data);
+            });
+        }
+
         async function measureUpload() {
             const speedVal = document.getElementById('speed-value');
-            const sizes = [2_000_000, 4_000_000, 6_000_000];
             const results = [];
 
+            // 3 sequential XHR uploads - increasing size
+            const sizes = [2_000_000, 4_000_000, 6_000_000];
             for (const size of sizes) {
-                try {
-                    // Use Blob — most compatible across all Android Chrome versions
-                    const data = new Uint8Array(size).fill(0x41); // fill with 'A'
-                    const blob = new Blob([data], { type: 'application/octet-stream' });
-                    const t0 = performance.now();
-                    const res = await fetch('https://speed.cloudflare.com/__up?t=' + Date.now(), {
-                        method: 'POST',
-                        body: blob,
-                        cache: 'no-store'
-                    });
-                    if (!res.ok && res.status !== 200 && res.status !== 0) continue;
-                    const elapsed = (performance.now() - t0) / 1000;
-                    if (elapsed < 0.1) continue; // skip suspiciously fast results
-                    const mbps = (size * 8) / (elapsed * 1_000_000);
+                const mbps = await xhrUpload(size);
+                if (mbps > 0) {
                     results.push(mbps);
                     speedVal.textContent = mbps.toFixed(1);
-                    await new Promise(r => setTimeout(r, 100));
-                } catch(e) {
-                    console.log('Upload attempt failed:', e.message);
                 }
+                await new Promise(r => setTimeout(r, 150));
             }
 
             if (!results.length) return 0;
             results.sort((a, b) => b - a);
-            // Average top 2 results
             return results.slice(0, 2).reduce((s, v) => s + v, 0) / Math.min(results.length, 2);
         }
 
