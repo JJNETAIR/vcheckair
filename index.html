@@ -834,21 +834,25 @@
             requestAnimationFrame(step);
         }
 
-        // ── PING: 8 samples, trim outliers, return median ────────
+        // ── PING: HEAD request = smallest possible packet ────────
         async function measurePing() {
             const times = [];
-            for (let i = 0; i < 8; i++) {
+            // Warmup first (ignore)
+            try { await fetch('https://speed.cloudflare.com/__down?bytes=1&t=warmup', { cache: 'no-store' }); } catch(e) {}
+            
+            for (let i = 0; i < 10; i++) {
                 const t0 = performance.now();
                 try {
                     await fetch('https://speed.cloudflare.com/__down?bytes=1&t=' + Date.now(), 
                         { cache: 'no-store' });
                 } catch(e) {}
                 times.push(performance.now() - t0);
-                await new Promise(r => setTimeout(r, 100));
+                await new Promise(r => setTimeout(r, 80));
             }
             times.sort((a, b) => a - b);
-            const trimmed = times.slice(1, 6); // drop lowest and 2 highest
-            return Math.round(trimmed.reduce((a, b) => a + b, 0) / trimmed.length);
+            // Take best 4 samples (lowest = closest to real ping)
+            const best = times.slice(0, 4);
+            return Math.round(best.reduce((a, b) => a + b, 0) / best.length);
         }
 
         // ── STREAMING DOWNLOAD: reads chunks in real-time ────────
@@ -926,20 +930,50 @@
             return final;
         }
 
-        // ── UPLOAD: XHR method — most compatible on all Android ──
+        // ── UPLOAD: XHR with upload progress tracking ────────────
+        // Uses xhr.upload.onprogress to measure ACTUAL bytes sent not response time
         function xhrUpload(size) {
             return new Promise((resolve) => {
-                const data = new Uint8Array(size).fill(65); // 'A'
+                const data = new Uint8Array(size).fill(65);
                 const xhr = new XMLHttpRequest();
-                const t0 = performance.now();
+                let t0 = null;
+                let lastLoaded = 0;
+                let lastTime = 0;
+                const samples = [];
+
+                // Track actual upload progress in real-time
+                xhr.upload.onprogress = (e) => {
+                    if (!t0) { t0 = performance.now(); return; }
+                    const now = performance.now();
+                    const elapsed = (now - lastTime) / 1000;
+                    const bytes = e.loaded - lastLoaded;
+                    if (elapsed > 0.1 && bytes > 0) {
+                        const mbps = (bytes * 8) / (elapsed * 1_000_000);
+                        samples.push(mbps);
+                    }
+                    lastLoaded = e.loaded;
+                    lastTime = now;
+                };
+
+                xhr.upload.onloadstart = () => { t0 = performance.now(); lastTime = t0; };
+
+                xhr.onload = xhr.onerror = xhr.ontimeout = () => {
+                    if (!samples.length && t0) {
+                        // Fallback: use total time if no progress events
+                        const elapsed = (performance.now() - t0) / 1000;
+                        const mbps = elapsed > 0.2 ? (size * 8) / (elapsed * 1_000_000) : 0;
+                        resolve(mbps);
+                        return;
+                    }
+                    // Use median of progress samples (most accurate)
+                    samples.sort((a, b) => a - b);
+                    const median = samples[Math.floor(samples.length * 0.5)] || 0;
+                    resolve(median);
+                };
+
+                xhr.timeout = 10000;
                 xhr.open('POST', 'https://speed.cloudflare.com/__up?t=' + Date.now(), true);
                 xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-                xhr.onload = xhr.onerror = xhr.ontimeout = () => {
-                    const elapsed = (performance.now() - t0) / 1000;
-                    const mbps = elapsed > 0.1 ? (size * 8) / (elapsed * 1_000_000) : 0;
-                    resolve(mbps);
-                };
-                xhr.timeout = 8000;
                 xhr.send(data);
             });
         }
@@ -948,20 +982,21 @@
             const speedVal = document.getElementById('speed-value');
             const results = [];
 
-            // 3 sequential XHR uploads - increasing size
-            const sizes = [2_000_000, 4_000_000, 6_000_000];
+            // 3 rounds: warmup small, then bigger for accuracy
+            const sizes = [1_000_000, 3_000_000, 5_000_000];
             for (const size of sizes) {
                 const mbps = await xhrUpload(size);
-                if (mbps > 0) {
+                if (mbps > 1) { // ignore suspiciously low/zero
                     results.push(mbps);
                     speedVal.textContent = mbps.toFixed(1);
                 }
-                await new Promise(r => setTimeout(r, 150));
+                await new Promise(r => setTimeout(r, 200));
             }
 
             if (!results.length) return 0;
-            results.sort((a, b) => b - a);
-            return results.slice(0, 2).reduce((s, v) => s + v, 0) / Math.min(results.length, 2);
+            // Drop warmup (first), average rest
+            const valid = results.length > 1 ? results.slice(1) : results;
+            return valid.reduce((s, v) => s + v, 0) / valid.length;
         }
 
         let ratingEl = null; // global so measureDownload can update it
