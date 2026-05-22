@@ -867,22 +867,31 @@
             return valid.length ? valid[0].ping : 100;
         }
 
-        // ── PING: 20 samples on best server ───────────────────────
-        async function measurePing() {
-            // Warmup
-            for (let i = 0; i < 3; i++) {
-                try { await fetch(bestServer.down + '1&t=w' + i, { cache: 'no-store' }); } catch(e) {}
-            }
-            const times = [];
-            for (let i = 0; i < 20; i++) {
-                const t0 = performance.now();
-                try { await fetch(bestServer.down + '1&t=' + Date.now(), { cache: 'no-store' }); } catch(e) {}
-                times.push(performance.now() - t0);
-                await new Promise(r => setTimeout(r, 40));
-            }
-            times.sort((a, b) => a - b);
-            return Math.round(times.slice(0, 5).reduce((a, b) => a + b, 0) / 5);
-        }
+                 // ── PING: Multi-endpoint parallel, pick absolute fastest ──
+         async function measurePing() {
+             const endpoints = [
+                 'https://speed.cloudflare.com/__down?bytes=1&t=',
+                 'https://1.1.1.1/cdn-cgi/trace?t=',
+                 'https://1.0.0.1/cdn-cgi/trace?t=',
+             ];
+             // Warmup all simultaneously
+             await Promise.allSettled(endpoints.map(ep =>
+                 fetch(ep + 'w' + Date.now(), { cache: 'no-store', mode: 'no-cors' }).catch(()=>{})
+             ));
+             // 8 samples from each endpoint in parallel
+             const allTimes = [];
+             await Promise.allSettled(endpoints.map(async (ep) => {
+                 for (let i = 0; i < 8; i++) {
+                     const t0 = performance.now();
+                     try { await fetch(ep + Date.now(), { cache: 'no-store', mode: 'no-cors' }); } catch(e) {}
+                     allTimes.push(performance.now() - t0);
+                     await new Promise(r => setTimeout(r, 30));
+                 }
+             }));
+             if (!allTimes.length) return 50;
+             allTimes.sort((a, b) => a - b);
+             return Math.round(allTimes.slice(0, 5).reduce((a, b) => a + b, 0) / 5);
+         }
 
         // ── STREAMING DOWNLOAD: chunk-by-chunk measurement ────────
         async function streamDownload(bytes, onProgress) {
@@ -950,9 +959,8 @@
             return best;
         }
 
-        // ── UPLOAD: 3-method fallback chain ───────────────────────
-        // Method A: XHR with progress events
-        function uploadMethodA(size) {
+        // ── UPLOAD: Parallel XHR streams — same method as download ─
+        function singleXhrUpload(size) {
             return new Promise((resolve) => {
                 const data = new Uint8Array(size).fill(65);
                 const xhr = new XMLHttpRequest();
@@ -964,74 +972,66 @@
                     const now = performance.now();
                     const dt = (now - lastTime) / 1000;
                     const db = e.loaded - lastBytes;
-                    if (dt >= 0.15 && db > 0) {
-                        samples.push((db * 8) / (dt * 1_000_000));
-                        lastBytes = e.loaded; lastTime = now;
+                    if (dt >= 0.1 && db > 0) {
+                        const mbps = (db * 8) / (dt * 1_000_000);
+                        if (mbps > 0.5) samples.push(mbps);
+                        lastBytes = e.loaded;
+                        lastTime = now;
                     }
                 };
-                xhr.onload = () => {
-                    if (samples.length >= 2) {
-                        samples.sort((a,b) => a-b);
-                        const mid = samples.slice(
-                            Math.floor(samples.length*0.1),
-                            Math.floor(samples.length*0.9)
-                        );
-                        resolve(mid.length ? mid.reduce((s,v)=>s+v,0)/mid.length : 0);
+
+                xhr.onload = xhr.onerror = xhr.ontimeout = () => {
+                    if (samples.length >= 3) {
+                        samples.sort((a, b) => a - b);
+                        // Use middle 60% samples
+                        const lo = Math.floor(samples.length * 0.2);
+                        const hi = Math.ceil(samples.length * 0.8);
+                        const mid = samples.slice(lo, hi);
+                        resolve(mid.reduce((s,v)=>s+v,0) / mid.length);
                     } else {
-                        const el = (performance.now()-t0)/1000;
-                        resolve(el > 0.2 ? (size*8)/(el*1_000_000) : 0);
+                        // Fallback: total bytes / total time
+                        const elapsed = (performance.now() - t0) / 1000;
+                        resolve(elapsed > 0.3 ? (size * 8) / (elapsed * 1_000_000) : 0);
                     }
                 };
-                xhr.onerror = xhr.ontimeout = () => {
-                    const el = (performance.now()-t0)/1000;
-                    resolve(el > 0.2 ? (size*8)/(el*1_000_000) : 0);
-                };
-                xhr.timeout = 12000;
-                xhr.open('POST', bestServer.up + '?t=' + Date.now(), true);
+
+                xhr.timeout = 15000;
+                xhr.open('POST', bestServer.up + '?t=' + Date.now() + '_' + Math.random(), true);
                 xhr.setRequestHeader('Content-Type', 'application/octet-stream');
                 xhr.send(data);
             });
         }
 
-        // Method B: fetch with total timing (fallback)
-        async function uploadMethodB(size) {
-            const data = new Uint8Array(size).fill(65);
-            const t0 = performance.now();
-            try {
-                await fetch(bestServer.up + '?t=' + Date.now(), {
-                    method: 'POST', body: data, cache: 'no-store'
-                });
-            } catch(e) {}
-            const elapsed = (performance.now()-t0)/1000;
-            return elapsed > 0.3 ? (size*8)/(elapsed*1_000_000) : 0;
-        }
-
         async function measureUpload() {
             const speedVal = document.getElementById('speed-value');
-            const results = [];
+            let best = 0;
 
-            // Try Method A first (most accurate)
-            const sizes = [2_000_000, 5_000_000, 8_000_000];
-            for (const size of sizes) {
-                let mbps = await uploadMethodA(size);
-                // If Method A gives 0, fallback to Method B
-                if (mbps < 1) {
-                    mbps = await uploadMethodB(size);
+            const update = (mbps) => {
+                if (mbps > best) {
+                    best = mbps;
+                    speedVal.textContent = best.toFixed(1);
                 }
-                if (mbps > 1) {
-                    results.push(mbps);
-                    speedVal.textContent = mbps.toFixed(1);
-                }
-                await new Promise(r => setTimeout(r, 150));
-            }
+            };
 
-            if (!results.length) return 0;
-            // Drop highest (burst) take average of rest
-            results.sort((a,b) => a-b);
-            const trimmed = results.slice(0, Math.max(1, results.length-1));
-            const avg = trimmed.reduce((s,v)=>s+v,0)/trimmed.length;
-            speedVal.textContent = avg.toFixed(1);
-            return avg;
+            // Phase 1: warmup — 2 parallel streams x 3MB
+            ratingEl.innerHTML = '<span class="px-5 py-2 rounded-full bg-blue-50 text-blue-500 text-sm font-medium">⬆️ Warming up upload...</span>';
+            const w = await Promise.all(Array.from({length:2}, () => singleXhrUpload(3_000_000)));
+            update(w.reduce((s,v)=>s+v,0));
+
+            // Phase 2: 4 parallel streams x 6MB
+            ratingEl.innerHTML = '<span class="px-5 py-2 rounded-full bg-blue-50 text-blue-500 text-sm font-medium">⬆️ Testing upload...</span>';
+            const p2 = await Promise.all(Array.from({length:4}, () => singleXhrUpload(6_000_000)));
+            const p2total = p2.reduce((s,v)=>s+v,0);
+            update(p2total);
+
+            // Phase 3: 6 parallel streams x 8MB — full blast
+            ratingEl.innerHTML = '<span class="px-5 py-2 rounded-full bg-blue-50 text-blue-500 text-sm font-medium">⬆️ Full upload speed...</span>';
+            const p3 = await Promise.all(Array.from({length:6}, () => singleXhrUpload(8_000_000)));
+            const p3total = p3.reduce((s,v)=>s+v,0);
+            update(p3total);
+
+            speedVal.textContent = best.toFixed(1);
+            return best;
         }
 
 
