@@ -754,51 +754,41 @@
         }
 
         async function measureDownload() {
-            // PARALLEL connections like Ookla - saturates full bandwidth
-            // Round 1: 4 parallel x 5MB
-            // Round 2: 8 parallel x 10MB
-            // Round 3: 8 parallel x 25MB
+            // 2 rounds only, parallel connections, time-capped at 6s each
             const rounds = [
-                { connections: 4,  bytes: 5_000_000  },
-                { connections: 8,  bytes: 10_000_000 },
-                { connections: 8,  bytes: 25_000_000 },
+                { connections: 4, bytes: 10_000_000 },  // Round 1: warmup
+                { connections: 8, bytes: 10_000_000 },  // Round 2: full blast
             ];
             const roundResults = [];
-
             for (const round of rounds) {
                 try {
                     const t0 = performance.now();
-                    // Fire all connections simultaneously
                     const fetches = Array.from({ length: round.connections }, (_, i) =>
                         fetch(`https://speed.cloudflare.com/__down?bytes=${round.bytes}&t=${Date.now()}_${i}`, { cache: 'no-store' })
                             .then(r => r.arrayBuffer())
                     );
-                    const buffers = await Promise.all(fetches);
+                    // Time cap: max 6 seconds per round
+                    const timeout = new Promise(r => setTimeout(() => r([]), 6000));
+                    const buffers = await Promise.race([Promise.all(fetches), timeout]);
+                    if (!buffers.length) continue;
                     const elapsed = (performance.now() - t0) / 1000;
-                    const totalBytes = buffers.reduce((sum, b) => sum + b.byteLength, 0);
+                    const totalBytes = buffers.reduce((sum, b) => sum + (b.byteLength||0), 0);
                     const mbps = (totalBytes * 8) / (elapsed * 1_000_000);
                     roundResults.push(mbps);
-
-                    // Live update gauge
-                    const best = Math.max(...roundResults);
-                    document.getElementById('speed-value').textContent = best.toFixed(1);
-                    setArc(best, 600);
-                    await new Promise(r => setTimeout(r, 200));
+                    document.getElementById('speed-value').textContent = mbps.toFixed(1);
+                    setArc(mbps, 600);
                 } catch(e) {}
             }
-            // Return best round result (like Ookla uses peak)
             return roundResults.length ? Math.max(...roundResults) : 0;
         }
 
         async function measureUpload() {
-            // PARALLEL upload connections
+            // 2 rounds parallel upload, time-capped at 5s each
             const rounds = [
-                { connections: 4, size: 2_000_000 },
-                { connections: 6, size: 4_000_000 },
-                { connections: 8, size: 6_000_000 },
+                { connections: 4, size: 3_000_000 },
+                { connections: 6, size: 3_000_000 },
             ];
             const roundResults = [];
-
             for (const round of rounds) {
                 try {
                     const t0 = performance.now();
@@ -808,16 +798,12 @@
                             method: 'POST', body: data, cache: 'no-store'
                         });
                     });
-                    await Promise.all(fetches);
+                    const timeout = new Promise(r => setTimeout(() => r([]), 5000));
+                    await Promise.race([Promise.all(fetches), timeout]);
                     const elapsed = (performance.now() - t0) / 1000;
-                    const totalBytes = round.connections * round.size;
-                    const mbps = (totalBytes * 8) / (elapsed * 1_000_000);
+                    const mbps = (round.connections * round.size * 8) / (elapsed * 1_000_000);
                     roundResults.push(mbps);
-
-                    // Live update
-                    const best = Math.max(...roundResults);
-                    document.getElementById('speed-value').textContent = best.toFixed(1);
-                    await new Promise(r => setTimeout(r, 200));
+                    document.getElementById('speed-value').textContent = mbps.toFixed(1);
                 } catch(e) {}
             }
             return roundResults.length ? Math.max(...roundResults) : 0;
