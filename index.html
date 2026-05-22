@@ -834,25 +834,189 @@
             requestAnimationFrame(step);
         }
 
-        // ── PING: HEAD request = smallest possible packet ────────
+        // ════════════════════════════════════════════════════════
+        // OOKLA-STYLE ENGINE — 15 second test, interval sampling
+        // ════════════════════════════════════════════════════════
+
+        // ── PING: 20 samples, TCP warmup, lowest 5 average ───────
         async function measurePing() {
             const times = [];
-            // Warmup first (ignore)
-            try { await fetch('https://speed.cloudflare.com/__down?bytes=1&t=warmup', { cache: 'no-store' }); } catch(e) {}
-            
-            for (let i = 0; i < 10; i++) {
+            // TCP warmup — 3 throwaway requests
+            for (let i = 0; i < 3; i++) {
+                try { await fetch('https://speed.cloudflare.com/__down?bytes=1&t=w' + i, { cache: 'no-store' }); } catch(e) {}
+            }
+            // Real samples
+            for (let i = 0; i < 20; i++) {
                 const t0 = performance.now();
                 try {
-                    await fetch('https://speed.cloudflare.com/__down?bytes=1&t=' + Date.now(), 
-                        { cache: 'no-store' });
+                    await fetch('https://speed.cloudflare.com/__down?bytes=1&t=' + Date.now(), { cache: 'no-store' });
                 } catch(e) {}
                 times.push(performance.now() - t0);
-                await new Promise(r => setTimeout(r, 80));
+                await new Promise(r => setTimeout(r, 50));
             }
             times.sort((a, b) => a - b);
-            // Take best 4 samples (lowest = closest to real ping)
-            const best = times.slice(0, 4);
+            // Average of best 5 (like Ookla uses lowest latency samples)
+            const best = times.slice(0, 5);
             return Math.round(best.reduce((a, b) => a + b, 0) / best.length);
+        }
+
+        // ── STREAMING DOWNLOAD: reads chunks in real-time ────────
+        async function streamDownload(bytes, onProgress) {
+            const url = `https://speed.cloudflare.com/__down?bytes=${bytes}&t=${Date.now()}`;
+            const t0 = performance.now();
+            let loaded = 0;
+            const samples = [];
+            try {
+                const res = await fetch(url, { cache: 'no-store' });
+                const reader = res.body.getReader();
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    loaded += value.length;
+                    const elapsed = (performance.now() - t0) / 1000;
+                    if (elapsed > 0.5) { // skip TCP warmup window
+                        const mbps = (loaded * 8) / (elapsed * 1_000_000);
+                        samples.push(mbps);
+                        if (onProgress) onProgress(mbps);
+                    }
+                }
+            } catch(e) {}
+            if (!samples.length) return 0;
+            // 90th percentile — Ookla style
+            samples.sort((a, b) => a - b);
+            return samples[Math.floor(samples.length * 0.9)] || 0;
+        }
+
+        // ── DOWNLOAD: Ookla-style 15s with growing parallelism ───
+        async function measureDownload() {
+            const speedVal = document.getElementById('speed-value');
+            let best = 0;
+
+            // Phase 1 — 4s: 2 streams warmup
+            ratingEl.innerHTML = '<span class="px-5 py-2 rounded-full bg-blue-50 text-blue-500 text-sm font-medium">⬇️ Warming up...</span>';
+            const phase1 = await Promise.all([
+                streamDownload(8_000_000, mbps => {
+                    best = Math.max(best, mbps);
+                    speedVal.textContent = best.toFixed(1);
+                    setArc(best, 600);
+                }),
+                streamDownload(8_000_000, mbps => {
+                    best = Math.max(best, mbps);
+                }),
+            ]);
+            best = Math.max(...phase1, best);
+
+            // Phase 2 — 5s: 4 streams
+            ratingEl.innerHTML = '<span class="px-5 py-2 rounded-full bg-blue-50 text-blue-500 text-sm font-medium">⬇️ Testing speed...</span>';
+            const phase2 = await Promise.all(
+                Array.from({ length: 4 }, () =>
+                    streamDownload(15_000_000, mbps => {
+                        // Combined throughput estimate
+                        const combined = mbps * 2.5;
+                        if (combined > best) {
+                            best = combined;
+                            speedVal.textContent = best.toFixed(1);
+                            setArc(best, 600);
+                        }
+                    })
+                )
+            );
+            // Sum of all streams = total throughput
+            const phase2total = phase2.reduce((s, v) => s + v, 0);
+            best = Math.max(best, phase2total);
+
+            // Phase 3 — 6s: 8 streams full blast
+            ratingEl.innerHTML = '<span class="px-5 py-2 rounded-full bg-blue-50 text-blue-500 text-sm font-medium">⬇️ Full speed...</span>';
+            const phase3 = await Promise.all(
+                Array.from({ length: 8 }, () =>
+                    streamDownload(20_000_000, mbps => {
+                        const combined = mbps * 5;
+                        if (combined > best) {
+                            best = combined;
+                            speedVal.textContent = best.toFixed(1);
+                            setArc(best, 600);
+                        }
+                    })
+                )
+            );
+            const phase3total = phase3.reduce((s, v) => s + v, 0);
+            best = Math.max(best, phase3total);
+
+            speedVal.textContent = best.toFixed(1);
+            setArc(best, 600);
+            return best;
+        }
+
+        // ── UPLOAD: XHR progress tracking, 3 phases ──────────────
+        function xhrUploadTimed(size, durationMs) {
+            return new Promise((resolve) => {
+                const data = new Uint8Array(size).fill(65);
+                const xhr = new XMLHttpRequest();
+                const t0 = performance.now();
+                const samples = [];
+                let lastLoaded = 0;
+                let lastTime = performance.now();
+
+                xhr.upload.onprogress = (e) => {
+                    const now = performance.now();
+                    const dt = (now - lastTime) / 1000;
+                    const db = e.loaded - lastLoaded;
+                    if (dt >= 0.2 && db > 0) {
+                        const mbps = (db * 8) / (dt * 1_000_000);
+                        samples.push(mbps);
+                        lastLoaded = e.loaded;
+                        lastTime = now;
+                    }
+                };
+
+                xhr.onload = xhr.onerror = xhr.ontimeout = () => {
+                    if (!samples.length) {
+                        const elapsed = (performance.now() - t0) / 1000;
+                        resolve(elapsed > 0.3 ? (size * 8) / (elapsed * 1_000_000) : 0);
+                        return;
+                    }
+                    // Drop top 10% (bursts) and bottom 10% (slow start)
+                    samples.sort((a, b) => a - b);
+                    const trimmed = samples.slice(
+                        Math.floor(samples.length * 0.1),
+                        Math.floor(samples.length * 0.9)
+                    );
+                    const avg = trimmed.length
+                        ? trimmed.reduce((s, v) => s + v, 0) / trimmed.length
+                        : samples[Math.floor(samples.length / 2)];
+                    resolve(avg);
+                };
+
+                xhr.timeout = durationMs + 3000;
+                xhr.open('POST', 'https://speed.cloudflare.com/__up?t=' + Date.now(), true);
+                xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+                xhr.send(data);
+            });
+        }
+
+        async function measureUpload() {
+            const speedVal = document.getElementById('speed-value');
+            const results = [];
+
+            // Phase 1: warmup 1MB
+            const w = await xhrUploadTimed(1_000_000, 3000);
+            // Phase 2: 3MB
+            const r1 = await xhrUploadTimed(3_000_000, 5000);
+            if (r1 > 0) { results.push(r1); speedVal.textContent = r1.toFixed(1); }
+            await new Promise(r => setTimeout(r, 100));
+            // Phase 3: 6MB
+            const r2 = await xhrUploadTimed(6_000_000, 7000);
+            if (r2 > 0) { results.push(r2); speedVal.textContent = r2.toFixed(1); }
+            await new Promise(r => setTimeout(r, 100));
+            // Phase 4: 10MB final
+            const r3 = await xhrUploadTimed(10_000_000, 8000);
+            if (r3 > 0) { results.push(r3); speedVal.textContent = r3.toFixed(1); }
+
+            if (!results.length) return 0;
+            // Average of all phases (excluding warmup)
+            const avg = results.reduce((s, v) => s + v, 0) / results.length;
+            speedVal.textContent = avg.toFixed(1);
+            return avg;
         }
 
         // ── STREAMING DOWNLOAD: reads chunks in real-time ────────
