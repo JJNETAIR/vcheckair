@@ -162,35 +162,63 @@
         </div>
 
         <!-- Speed Test Content - scrollable -->
-        <div class="flex-1 overflow-y-auto px-6 space-y-4" style="padding-bottom:90px">
+        <div class="flex-1 overflow-y-auto px-4 space-y-3" style="padding-bottom:90px">
 
-            <!-- Gauge + WiFi symbol left side -->
-            <div class="relative flex items-center justify-center py-2">
-                <!-- WiFi Symbol - left of gauge -->
-                <div class="absolute left-0 flex flex-col items-center gap-1">
-                    <svg width="36" height="28" viewBox="0 0 24 20">
+            <!-- Apple-style Needle Speedometer -->
+            <div class="relative flex items-center justify-center pt-2">
+                <!-- WiFi signal - top left -->
+                <div class="absolute left-2 top-4 flex flex-col items-center gap-0.5">
+                    <svg width="28" height="22" viewBox="0 0 24 20">
                         <path id="wifi-arc3" d="M1.5 7C5.5 3 10.5 1 12 1s6.5 2 10.5 6" stroke="#E5E7EB" stroke-width="2.5" stroke-linecap="round" fill="none"/>
                         <path id="wifi-arc2" d="M4.5 10.5C7 8 9.5 7 12 7s5 1 7.5 3.5" stroke="#E5E7EB" stroke-width="2.5" stroke-linecap="round" fill="none"/>
                         <path id="wifi-arc1" d="M7.5 14C9 12.5 10.5 12 12 12s3 .5 4.5 2" stroke="#E5E7EB" stroke-width="2.5" stroke-linecap="round" fill="none"/>
                         <circle id="wifi-dot" cx="12" cy="18" r="1.8" fill="#E5E7EB"/>
                     </svg>
-                    <span id="wifi-quality" class="text-[9px] text-[#86868B] text-center leading-tight" style="max-width:48px"></span>
+                    <span id="wifi-quality" class="text-[8px] text-[#86868B] text-center leading-tight" style="max-width:36px"></span>
                 </div>
 
-                <!-- Gauge Circle -->
-                <svg width="200" height="200" viewBox="0 0 220 220">
-                    <circle cx="110" cy="110" r="90" fill="none" stroke="#E5E7EB" stroke-width="12" stroke-dasharray="565" stroke-dashoffset="142" stroke-linecap="round" transform="rotate(135 110 110)"/>
-                    <circle id="speed-arc" cx="110" cy="110" r="90" fill="none" stroke="#0071E3" stroke-width="12" stroke-dasharray="565" stroke-dashoffset="565" stroke-linecap="round" transform="rotate(135 110 110)" style="transition:stroke-dashoffset 0.3s ease,stroke 0.3s ease"/>
+                <!-- SVG Speedometer — Apple style -->
+                <svg id="speedo-svg" width="280" height="200" viewBox="0 0 280 200">
+                    <defs>
+                        <!-- Apple gradient: SF Blue → SF Teal -->
+                        <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%"   stop-color="#34AADC"/>
+                            <stop offset="50%"  stop-color="#0071E3"/>
+                            <stop offset="100%" stop-color="#30D158"/>
+                        </linearGradient>
+                        <filter id="needleShadow">
+                            <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#0071E3" flood-opacity="0.4"/>
+                        </filter>
+                    </defs>
+
+                    <!-- Background arc track -->
+                    <path id="track-arc" d="" fill="none" stroke="#E5E7EB" stroke-width="10" stroke-linecap="round"/>
+                    <!-- Colored progress arc -->
+                    <path id="speed-arc" d="" fill="none" stroke="url(#arcGrad)" stroke-width="10" stroke-linecap="round" style="transition: stroke-dashoffset 0.25s ease"/>
+                    <!-- Speed scale labels -->
+                    <text id="lbl0"   font-size="9" fill="#86868B" text-anchor="middle" font-family="-apple-system,sans-serif">0</text>
+                    <text id="lbl50"  font-size="9" fill="#86868B" text-anchor="middle" font-family="-apple-system,sans-serif">50</text>
+                    <text id="lbl100" font-size="9" fill="#86868B" text-anchor="middle" font-family="-apple-system,sans-serif">100</text>
+                    <text id="lbl250" font-size="9" fill="#86868B" text-anchor="middle" font-family="-apple-system,sans-serif">250</text>
+                    <text id="lbl500" font-size="9" fill="#86868B" text-anchor="middle" font-family="-apple-system,sans-serif">500</text>
+                    <text id="lbl750" font-size="9" fill="#86868B" text-anchor="middle" font-family="-apple-system,sans-serif">750</text>
+                    <!-- Needle -->
+                    <line id="speedo-needle" x1="140" y1="150" x2="140" y2="60"
+                          stroke="white" stroke-width="3" stroke-linecap="round"
+                          filter="url(#needleShadow)"
+                          style="transform-origin:140px 150px; transform:rotate(-135deg); transition:transform 0.4s cubic-bezier(.4,0,.2,1)"/>
+                    <!-- Center hub -->
+                    <circle cx="140" cy="150" r="7" fill="#1D1D1F"/>
+                    <circle cx="140" cy="150" r="4" fill="#0071E3"/>
+                    <!-- Value text -->
+                    <text id="speed-value" x="140" y="128" font-size="36" font-weight="700" fill="#1D1D1F" text-anchor="middle" font-family="-apple-system,sans-serif" letter-spacing="-1">0.0</text>
+                    <text x="140" y="145" font-size="11" fill="#86868B" text-anchor="middle" font-family="-apple-system,sans-serif">Mbps</text>
+                    <text id="speed-label" x="140" y="160" font-size="10" fill="#86868B" text-anchor="middle" font-family="-apple-system,sans-serif">Download</text>
                 </svg>
-                <div class="absolute flex flex-col items-center justify-center">
-                    <span id="speed-value" class="text-5xl font-bold text-[#1D1D1F] tabular-nums">0.0</span>
-                    <span class="text-sm font-medium text-[#86868B] mt-1">Mbps</span>
-                    <span id="speed-label" class="text-xs font-medium text-[#86868B] mt-1">Download</span>
-                </div>
             </div>
 
             <!-- Rating Badge -->
-            <div id="speed-rating" class="flex justify-center">
+            <div id="speed-rating" class="flex justify-center -mt-2">
                 <span class="px-5 py-2 rounded-full bg-gray-100 text-gray-400 text-sm font-medium">Tap to test your speed</span>
             </div>
 
@@ -803,23 +831,75 @@
         let isTesting = false;
 
         function getRating(mbps) {
-            if (mbps >= 200) return { text: '🚀 Ultra Fast',  color: '#10B981', arc: '#10B981' };
-            if (mbps >= 100) return { text: '🚀 Excellent',   color: '#10B981', arc: '#10B981' };
-            if (mbps >=  50) return { text: '🟢 Very Good',   color: '#10B981', arc: '#10B981' };
-            if (mbps >=  20) return { text: '🟢 Good',        color: '#10B981', arc: '#10B981' };
-            if (mbps >=   5) return { text: '🟡 Fair',        color: '#F59E0B', arc: '#F59E0B' };
-            return                   { text: '🔴 Poor',        color: '#EF4444', arc: '#EF4444' };
+            if (mbps >= 200) return { text: '🚀 Ultra Fast', color: '#30D158' };
+            if (mbps >= 100) return { text: '🚀 Excellent',  color: '#30D158' };
+            if (mbps >=  50) return { text: '🟢 Very Good',  color: '#34C759' };
+            if (mbps >=  20) return { text: '🟢 Good',       color: '#0071E3' };
+            if (mbps >=   5) return { text: '🟡 Fair',       color: '#FF9F0A' };
+            return                   { text: '🔴 Poor',       color: '#FF3B30' };
         }
 
-        function setArc(mbps, maxMbps = 600) {
-            const arc = document.getElementById('speed-arc');
-            const total = 565; // full circumference used
-            const pct = Math.min(mbps / maxMbps, 1);
-            const offset = total - (pct * total * 0.75); // 270 degree arc
-            arc.style.strokeDashoffset = offset;
-            const r = getRating(mbps);
-            arc.style.stroke = r.arc;
+        // ── NEEDLE SPEEDOMETER SETUP ──────────────────────────────
+        // Log scale: 0,5,10,50,100,250,500,750 mapped to -135° → +135°
+        const SCALE = [0,5,10,50,100,250,500,750];
+        const CX=140, CY=150, R=95; // center and radius
+        const START_DEG=-135, SWEEP=270;
+
+        function mbpsToAngle(mbps) {
+            const maxVal = 750;
+            // Log scale for better resolution at low speeds
+            const logVal = mbps <= 0 ? 0 : Math.log10(Math.max(mbps,0.1)+1)/Math.log10(maxVal+1);
+            return START_DEG + logVal * SWEEP;
         }
+
+        function polarToXY(angleDeg, r) {
+            const rad = (angleDeg - 90) * Math.PI / 180;
+            return { x: CX + r * Math.cos(rad), y: CY + r * Math.sin(rad) };
+        }
+
+        function buildArcPath(startDeg, endDeg, r) {
+            const s = polarToXY(startDeg, r);
+            const e = polarToXY(endDeg, r);
+            const large = Math.abs(endDeg - startDeg) > 180 ? 1 : 0;
+            const sweep = endDeg > startDeg ? 1 : 0;
+            return `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} ${sweep} ${e.x} ${e.y}`;
+        }
+
+        function initSpeedometer() {
+            // Draw track arc
+            const track = document.getElementById('track-arc');
+            if(track) track.setAttribute('d', buildArcPath(START_DEG, START_DEG+SWEEP, R));
+            // Draw speed arc (starts empty)
+            const arc = document.getElementById('speed-arc');
+            if(arc){ arc.setAttribute('d', buildArcPath(START_DEG, START_DEG, R)); arc.style.transition='none'; }
+            // Place scale labels
+            SCALE.forEach((val, i) => {
+                const id = ['lbl0','lbl50','lbl100','lbl250','lbl500','lbl750'][Math.min(i,5)];
+                // Map indices: 0=0,1=5,2=10,3=50,4=100,5=250,6=500,7=750
+                const labels = {0:'0',1:'5',2:'10',3:'50',4:'100',5:'250',6:'500',7:'750'};
+                const lbl = document.getElementById(id);
+                const ang = mbpsToAngle(val);
+                const pos = polarToXY(ang, R+18);
+                if(lbl){ lbl.setAttribute('x', pos.x); lbl.setAttribute('y', pos.y+3); lbl.textContent=labels[i]||val; }
+            });
+        }
+
+        function setArc(mbps, maxMbps=750) {
+            const endAngle = mbpsToAngle(Math.min(mbps, 750));
+            // Update progress arc
+            const arc = document.getElementById('speed-arc');
+            if(arc){
+                arc.style.transition = 'none';
+                const newPath = buildArcPath(START_DEG, endAngle, R);
+                arc.setAttribute('d', newPath);
+            }
+            // Rotate needle
+            const needle = document.getElementById('speedo-needle');
+            if(needle) needle.style.transform = `rotate(${endAngle}deg)`;
+        }
+
+        // Init on load
+        document.addEventListener('DOMContentLoaded', initSpeedometer);
 
         function animateValue(el, target, duration, suffix) {
             const start = performance.now();
@@ -904,7 +984,7 @@
                 ratingEl.innerHTML = `<span class="px-5 py-2 rounded-full bg-blue-50 text-blue-500 text-sm font-medium">${ph.label}</span>`;
                 const results = await Promise.all(Array.from({length:ph.streams},()=>streamChunk(ph.bytes)));
                 // Sum all streams = total throughput, apply 0.82 calibration
-                const total = results.reduce((s,v)=>s+v,0) * 0.82;
+                const total = results.reduce((s,v)=>s+v,0) * 0.55; // calibrated to match real throughput
                 if(total > best){
                     best = total;
                     // Animate gradually like Ookla
@@ -938,8 +1018,12 @@
                     if(samples.length>=2){
                         samples.sort((a,b)=>a-b);
                         const mid=samples.slice(Math.floor(samples.length*0.2),Math.floor(samples.length*0.8));
-                        resolve(mid.length ? mid.reduce((s,v)=>s+v,0)/mid.length : 0);
+                        const avg = mid.length ? mid.reduce((s,v)=>s+v,0)/mid.length : 0;
+                        // If progress-based avg seems too low, cross-check with total timing
+                        const totalBased = elapsed>0.3?(size*8)/(elapsed*1e6):0;
+                        resolve(Math.max(avg, totalBased*0.9));
                     } else {
+                        // Fallback: use total bytes / total time (Android fallback)
                         resolve(elapsed>0.3?(size*8)/(elapsed*1e6):0);
                     }
                 };
