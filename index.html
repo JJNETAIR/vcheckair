@@ -910,57 +910,73 @@
                 ctx.fillText(String(val), lx, ly);
             });
 
-            // ── OOKLA-STYLE NEEDLE — from center outward only ─────
+            // ── OOKLA-STYLE ROUNDED NEEDLE ────────────────────────
             const cos = Math.cos(needleRad), sin = Math.sin(needleRad);
-            const px = -sin, py = cos; // perpendicular direction
+            const px = -sin, py = cos; // perpendicular
 
-            // Needle goes FROM center (wide) TO tip (sharp)
-            // No tail behind center!
-            const tipD = R - 20; // tip stops before arc
+            const tipD = R - 18; // how far needle reaches
             const tx = CX + tipD * cos;
             const ty = CY + tipD * sin;
 
-            // Needle shape: triangle from center to tip
-            const baseHalf = 7;  // half-width at center base
-            const tipHalf  = 0.8; // half-width at tip
-
             ctx.save();
-            ctx.shadowColor = 'rgba(0,0,0,0.2)';
-            ctx.shadowBlur = 8;
+            ctx.shadowColor = 'rgba(0,0,0,0.18)';
+            ctx.shadowBlur = 6;
             ctx.shadowOffsetX = 1;
-            ctx.shadowOffsetY = 1;
+            ctx.shadowOffsetY = 2;
+
+            // Draw needle as a rounded capsule/pill shape
+            // Using bezier curves for smooth rounded ends like Ookla
+            const hw = 5.5; // half-width at widest point (middle of needle)
+            const midX = CX + (tipD * 0.45) * cos;
+            const midY = CY + (tipD * 0.45) * sin;
 
             ctx.beginPath();
-            // Base (at center) — wide
-            ctx.moveTo(CX + px*baseHalf, CY + py*baseHalf);
-            // Tip — sharp
-            ctx.lineTo(tx + px*tipHalf, ty + py*tipHalf);
-            ctx.lineTo(tx - px*tipHalf, ty - py*tipHalf);
-            // Base other side
-            ctx.lineTo(CX - px*baseHalf, CY - py*baseHalf);
+            // Start at center (rounded base)
+            ctx.moveTo(CX + px * hw * 0.3, CY + py * hw * 0.3);
+            // Curve out to widest point
+            ctx.quadraticCurveTo(
+                CX + px * hw, CY + py * hw,
+                midX + px * hw, midY + py * hw
+            );
+            // Taper to rounded tip
+            ctx.quadraticCurveTo(
+                tx + px * hw * 0.5, ty + py * hw * 0.5,
+                tx, ty  // tip — rounded end
+            );
+            // Other side back
+            ctx.quadraticCurveTo(
+                tx - px * hw * 0.5, ty - py * hw * 0.5,
+                midX - px * hw, midY - py * hw
+            );
+            ctx.quadraticCurveTo(
+                CX - px * hw, CY - py * hw,
+                CX - px * hw * 0.3, CY - py * hw * 0.3
+            );
             ctx.closePath();
 
-            // Gradient: light at base → dark at tip (Ookla style)
+            // Gradient: light → dark like Ookla
             const nGrad = ctx.createLinearGradient(CX, CY, tx, ty);
-            nGrad.addColorStop(0,   'rgba(200,200,210,0.9)'); // light base
-            nGrad.addColorStop(0.4, 'rgba(120,120,140,0.95)');// mid
-            nGrad.addColorStop(1,   '#2C2C2E');               // dark tip
+            nGrad.addColorStop(0,   'rgba(210,210,220,0.85)');
+            nGrad.addColorStop(0.35,'rgba(140,140,160,0.95)');
+            nGrad.addColorStop(0.7, 'rgba(80,80,100,0.98)');
+            nGrad.addColorStop(1,   '#3a3a3c');
             ctx.fillStyle = nGrad;
             ctx.fill();
             ctx.restore();
 
-            // Center pivot circle — clean grey dot like Ookla
+            // Center pivot — simple clean circle like Ookla
             ctx.beginPath();
-            ctx.arc(CX, CY, 8, 0, Math.PI*2);
-            ctx.fillStyle = '#E5E5EA';
+            ctx.arc(CX, CY, 9, 0, Math.PI*2);
+            ctx.fillStyle = '#D1D1D6';
             ctx.fill();
             ctx.beginPath();
-            ctx.arc(CX, CY, 5, 0, Math.PI*2);
+            ctx.arc(CX, CY, 6, 0, Math.PI*2);
             ctx.fillStyle = '#AEAEB2';
             ctx.fill();
+            // Specular
             ctx.beginPath();
-            ctx.arc(CX-1, CY-1, 2, 0, Math.PI*2);
-            ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            ctx.arc(CX-1.5, CY-1.5, 2.5, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(255,255,255,0.55)';
             ctx.fill();
 
             // ── VALUE TEXT ────────────────────────────────────────
