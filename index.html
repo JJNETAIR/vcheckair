@@ -910,52 +910,43 @@
                 ctx.fillText(String(val), lx, ly);
             });
 
-            // ── OOKLA NEEDLE — simple flat rectangle ──────────────
-            const cos = Math.cos(needleRad), sin = Math.sin(needleRad);
-            const perp = { x: -sin, y: cos };
-
-            const needleLen = R - 20; // length from center to tip
-            const halfW = 5;          // half-width (flat rectangle)
-
-            // 4 corners of rectangle
-            const x1 = CX + perp.x * halfW;
-            const y1 = CY + perp.y * halfW;
-            const x2 = CX + cos * needleLen + perp.x * halfW;
-            const y2 = CY + sin * needleLen + perp.y * halfW;
-            const x3 = CX + cos * needleLen - perp.x * halfW;
-            const y3 = CY + sin * needleLen - perp.y * halfW;
-            const x4 = CX - perp.x * halfW;
-            const y4 = CY - perp.y * halfW;
-
+            // ── OOKLA NEEDLE — perfect rectangle using rotate ─────
+            // Save and rotate canvas so needle is always drawn horizontally
             ctx.save();
-            ctx.shadowColor = 'rgba(0,0,0,0.25)';
+            ctx.translate(CX, CY);
+            ctx.rotate(needleRad); // rotate to needle direction
+
+            const needleLen = R - 20; // length
+            const halfW = 5;          // constant half-width (no tapering!)
+
+            ctx.shadowColor = 'rgba(0,0,0,0.2)';
             ctx.shadowBlur = 6;
-            ctx.shadowOffsetX = 1;
+            ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 2;
 
-            // Draw flat rectangle needle
+            // Draw perfect rectangle from 0,0 to needleLen,0
             ctx.beginPath();
-            ctx.moveTo(x1, y1);
-            ctx.lineTo(x2, y2);
-            ctx.lineTo(x3, y3);
-            ctx.lineTo(x4, y4);
-            ctx.closePath();
+            ctx.rect(0, -halfW, needleLen, halfW * 2);
 
-            // Solid grey/white fill like Ookla logo
-            const nGrad = ctx.createLinearGradient(CX, CY,
-                CX + cos * needleLen, CY + sin * needleLen);
-            nGrad.addColorStop(0,   '#9a9aa0');  // grey at base
-            nGrad.addColorStop(0.3, '#d8d8de');  // lighter
-            nGrad.addColorStop(0.6, '#ebebf0');  // bright white
-            nGrad.addColorStop(1,   '#c0c0c8');  // tip
+            // Gradient along needle length
+            const nGrad = ctx.createLinearGradient(0, 0, needleLen, 0);
+            nGrad.addColorStop(0,   '#8a8a90');  // grey base
+            nGrad.addColorStop(0.3, '#d0d0d8');  // silver
+            nGrad.addColorStop(0.6, '#ececf0');  // bright
+            nGrad.addColorStop(1,   '#b0b0b8');  // tip
             ctx.fillStyle = nGrad;
             ctx.fill();
+
             ctx.restore();
 
-            // No center dot — Ookla logo has none! Clean pivot point
+            // Small pivot circle at center
             ctx.beginPath();
-            ctx.arc(CX, CY, 5, 0, Math.PI * 2);
-            ctx.fillStyle = '#ebebf0';
+            ctx.arc(CX, CY, 6, 0, Math.PI * 2);
+            ctx.fillStyle = '#d0d0d8';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(CX, CY, 3.5, 0, Math.PI * 2);
+            ctx.fillStyle = '#a0a0a8';
             ctx.fill();
 
             // ── VALUE TEXT ────────────────────────────────────────
@@ -1151,22 +1142,20 @@
         }
 
         // ── UPLOAD: Pure timing — reliable on all devices ────────
-        function pureTimingUpload(size) {
-            return new Promise(resolve => {
-                const data = new Uint8Array(size).fill(65);
-                const xhr = new XMLHttpRequest();
-                const t0 = performance.now();
-                xhr.onload = xhr.onerror = xhr.ontimeout = () => {
-                    const elapsed = (performance.now() - t0) / 1000;
-                    resolve(elapsed > 0.4 ? (size * 8) / (elapsed * 1e6) : 0);
-                };
-                xhr.timeout = 12000;
-                xhr.open('POST', `${CF}/__up?t=${Date.now()}_${Math.random()}`, true);
-                xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-                xhr.send(data);
-            });
+        // ── UPLOAD: fetch timing — most compatible ────────────────
+        async function pureTimingUpload(size) {
+            const data = new Uint8Array(size).fill(65);
+            const t0 = performance.now();
+            try {
+                await fetch(`${CF}/__up?t=${Date.now()}_${Math.random()}`, {
+                    method: 'POST',
+                    body: data,
+                    cache: 'no-store',
+                });
+            } catch(e) {}
+            const elapsed = (performance.now() - t0) / 1000;
+            return elapsed > 0.4 ? (size * 8) / (elapsed * 1e6) : 0;
         }
-
         async function measureUpload() {
             const speedEl = document.getElementById('speed-value');
             // Warmup — ignored
