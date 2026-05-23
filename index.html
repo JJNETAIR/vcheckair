@@ -178,7 +178,9 @@
                 </div>
 
                 <!-- Premium Apple-style Speedometer -->
-                <canvas id="speedo-canvas" width="300" height="220" style="width:300px;height:220px"></canvas>
+                <div style="background:linear-gradient(180deg,#1C1C1E 0%,#111113 100%);border-radius:24px;padding:8px 0 0;box-shadow:0 8px 32px rgba(0,0,0,0.25)">
+                    <canvas id="speedo-canvas" width="300" height="220" style="width:300px;height:220px;display:block"></canvas>
+                </div>
                 <!-- Hidden SVG text elements for compatibility -->
                 <svg style="position:absolute;opacity:0;pointer-events:none" width="1" height="1">
                     <text id="speed-value">0.0</text>
@@ -843,142 +845,123 @@
         function degToRad(d) { return d * Math.PI / 180; }
 
         function drawSpeedo(mbps) {
-            const {canvas, ctx, W, H, CX, CY, R, START, END, MARKS} = SPEEDO;
+            const {ctx, W, H, CX, CY, R, START, END, MARKS} = SPEEDO;
             if (!ctx) return;
-
             ctx.clearRect(0, 0, W, H);
-            // Transparent background — matches page bg
-            ctx.fillStyle = 'transparent';
-            ctx.fillRect(0, 0, W, H);
 
             const startRad = degToRad(START);
-            const endRad = degToRad(END);
-            const needleAngle = degToRad(mbpsToAngle(mbps));
+            const endRad   = degToRad(END);
+            const needleRad = degToRad(mbpsToAngle(mbps));
 
-            // ── BACKGROUND TRACK ──────────────────────────────────
+            // ── TRACK ARC (dark grey like Ookla) ──────────────────
             ctx.beginPath();
             ctx.arc(CX, CY, R, startRad, endRad);
-            ctx.strokeStyle = '#E5E7EB';
-            ctx.lineWidth = 14;
+            ctx.strokeStyle = '#2C2C2E';
+            ctx.lineWidth = 16;
             ctx.lineCap = 'round';
             ctx.stroke();
 
-            // ── COLORED PROGRESS ARC (gradient) ──────────────────
+            // ── PROGRESS ARC — Apple gradient ─────────────────────
             if (mbps > 0) {
                 const curRad = degToRad(mbpsToAngle(mbps));
-                // Build gradient along the arc
                 const gx1 = CX + R * Math.cos(startRad);
                 const gy1 = CY + R * Math.sin(startRad);
                 const gx2 = CX + R * Math.cos(curRad);
                 const gy2 = CY + R * Math.sin(curRad);
                 const grad = ctx.createLinearGradient(gx1, gy1, gx2, gy2);
-                grad.addColorStop(0.0, '#34AADC');  // Apple SF Blue Light
-                grad.addColorStop(0.4, '#0071E3');  // Apple Blue
-                grad.addColorStop(0.8, '#32ADE6');  // Apple Teal
-                grad.addColorStop(1.0, '#30D158');  // Apple Green
+                grad.addColorStop(0.0, '#64D2FF'); // Apple Cyan
+                grad.addColorStop(0.4, '#0071E3'); // Apple Blue
+                grad.addColorStop(0.75,'#34C759'); // Apple Green
+                grad.addColorStop(1.0, '#30D158'); // Apple Green bright
                 ctx.beginPath();
                 ctx.arc(CX, CY, R, startRad, curRad);
                 ctx.strokeStyle = grad;
-                ctx.lineWidth = 14;
+                ctx.lineWidth = 16;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+
+                // Arc glow
+                ctx.beginPath();
+                ctx.arc(CX, CY, R, startRad, curRad);
+                ctx.strokeStyle = 'rgba(100,210,255,0.15)';
+                ctx.lineWidth = 28;
                 ctx.lineCap = 'round';
                 ctx.stroke();
             }
 
-            // ── SCALE MARKS + LABELS ──────────────────────────────
+            // ── SCALE TICKS + LABELS ──────────────────────────────
             MARKS.forEach(val => {
-                const angle = degToRad(mbpsToAngle(val));
-                const cos = Math.cos(angle), sin = Math.sin(angle);
-                // Tick mark
+                const a = degToRad(mbpsToAngle(val));
+                const cos = Math.cos(a), sin = Math.sin(a);
+                // Tick
                 ctx.beginPath();
                 ctx.moveTo(CX + (R-10)*cos, CY + (R-10)*sin);
-                ctx.lineTo(CX + (R+2)*cos,  CY + (R+2)*sin);
-                ctx.strokeStyle = '#C7C7CC';
+                ctx.lineTo(CX + (R+3)*cos,  CY + (R+3)*sin);
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
                 ctx.lineWidth = 1.5;
                 ctx.stroke();
                 // Label
-                const lx = CX + (R+16)*cos;
-                const ly = CY + (R+16)*sin;
-                ctx.fillStyle = '#8E8E93';
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
                 ctx.font = '600 9px -apple-system,sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(val >= 1000 ? '1k' : String(val), lx, ly);
+                const lx = CX + (R+18)*cos;
+                const ly = CY + (R+18)*sin;
+                ctx.fillText(String(val), lx, ly);
             });
 
-            // ── CENTER HUB — premium layered pivot ───────────────
-            // Layer 1: outer shadow ring
-            ctx.beginPath();
-            ctx.arc(CX, CY, 14, 0, Math.PI*2);
-            ctx.fillStyle = 'rgba(0,0,0,0.15)';
-            ctx.fill();
-            // Layer 2: dark base ring
-            ctx.beginPath();
-            ctx.arc(CX, CY, 12, 0, Math.PI*2);
-            const baseGrad = ctx.createRadialGradient(CX-2, CY-3, 1, CX, CY, 12);
-            baseGrad.addColorStop(0, '#3a3a3c');
-            baseGrad.addColorStop(1, '#1c1c1e');
-            ctx.fillStyle = baseGrad;
-            ctx.fill();
-            // Layer 3: chrome ring
-            ctx.beginPath();
-            ctx.arc(CX, CY, 8, 0, Math.PI*2);
-            ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-            // Layer 4: glowing blue center dot
-            ctx.beginPath();
-            ctx.arc(CX, CY, 5, 0, Math.PI*2);
-            const dotGrad = ctx.createRadialGradient(CX-1, CY-1, 0.5, CX, CY, 5);
-            dotGrad.addColorStop(0, '#64D2FF');   // SF Cyan highlight
-            dotGrad.addColorStop(0.5, '#0071E3'); // Apple Blue
-            dotGrad.addColorStop(1, '#0040A0');   // deep blue edge
-            ctx.fillStyle = dotGrad;
-            ctx.fill();
-            // Layer 5: specular highlight
-            ctx.beginPath();
-            ctx.arc(CX-1.5, CY-1.5, 1.5, 0, Math.PI*2);
-            ctx.fillStyle = 'rgba(255,255,255,0.6)';
-            ctx.fill();
+            // ── OOKLA-STYLE TAPERED NEEDLE — no center dot ────────
+            const cos = Math.cos(needleRad), sin = Math.sin(needleRad);
+            // Perpendicular direction for needle width
+            const px = -sin, py = cos;
+            const baseW = 5;   // half-width at base
+            const tipW  = 0.5; // half-width at tip
+            const baseD = 30;  // distance from center toward base
+            const tipD  = R - 10; // distance from center toward tip
 
-            // ── NEEDLE — drawn LAST so it's always on top ─────────
-            const cos = Math.cos(needleAngle), sin = Math.sin(needleAngle);
+            // Base point (behind center)
+            const bx = CX - baseD * cos;
+            const by = CY - baseD * sin;
+            // Tip point (toward arc)
+            const tx = CX + tipD * cos;
+            const ty = CY + tipD * sin;
+
             ctx.save();
-            ctx.shadowColor = 'rgba(255,255,255,0.8)';
-            ctx.shadowBlur = 10;
-            // Needle: from just outside hub to just inside arc tip
-            const nGrad = ctx.createLinearGradient(
-                CX + 16*cos, CY + 16*sin,
-                CX + (R-8)*cos, CY + (R-8)*sin
-            );
-            nGrad.addColorStop(0, 'rgba(255,255,255,0.5)');
-            nGrad.addColorStop(1, '#FFFFFF');
+            // Needle glow
+            ctx.shadowColor = 'rgba(255,255,255,0.6)';
+            ctx.shadowBlur = 15;
+
+            // Draw tapered needle shape (like Ookla)
             ctx.beginPath();
-            ctx.moveTo(CX + 16*cos, CY + 16*sin);      // starts outside hub
-            ctx.lineTo(CX + (R-8)*cos, CY + (R-8)*sin); // ends near arc
-            ctx.strokeStyle = nGrad;
-            ctx.lineWidth = 3;
-            ctx.lineCap = 'round';
-            ctx.stroke();
+            ctx.moveTo(bx + px*baseW, by + py*baseW);  // base left
+            ctx.lineTo(tx + px*tipW,  ty + py*tipW);   // tip left
+            ctx.lineTo(tx - px*tipW,  ty - py*tipW);   // tip right
+            ctx.lineTo(bx - px*baseW, by - py*baseW);  // base right
+            ctx.closePath();
+
+            // Needle gradient: dark base → bright silver tip
+            const nGrad = ctx.createLinearGradient(bx, by, tx, ty);
+            nGrad.addColorStop(0,   'rgba(60,60,65,0.8)');   // dark base
+            nGrad.addColorStop(0.5, 'rgba(180,180,190,0.95)');// mid silver
+            nGrad.addColorStop(1,   '#FFFFFF');               // bright tip
+            ctx.fillStyle = nGrad;
+            ctx.fill();
             ctx.restore();
 
-            // ── VALUE TEXT (positioned to not block needle) ───────
+            // ── VALUE TEXT ────────────────────────────────────────
             const valStr = mbps.toFixed(mbps >= 100 ? 0 : 1);
-            // Value — large bold number
-            ctx.font = `700 ${valStr.length > 4 ? 36 : 42}px -apple-system,BlinkMacSystemFont,sans-serif`;
-            ctx.fillStyle = '#1D1D1F';
+            ctx.font = `700 ${valStr.length > 4 ? 34 : 40}px -apple-system,BlinkMacSystemFont,sans-serif`;
+            ctx.fillStyle = '#FFFFFF';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'alphabetic';
-            ctx.fillText(valStr, CX, CY - 38);
-            // Unit
-            ctx.font = '500 12px -apple-system,sans-serif';
-            ctx.fillStyle = '#8E8E93';
-            ctx.fillText('Mbps', CX, CY - 22);
-            // Label
+            ctx.fillText(valStr, CX, CY - 32);
+            ctx.font = '400 12px -apple-system,sans-serif';
+            ctx.fillStyle = 'rgba(255,255,255,0.6)';
+            ctx.fillText('Mbps', CX, CY - 15);
             const labelEl = document.getElementById('speed-label');
-            const labelText = labelEl ? labelEl.textContent : 'Download';
-            ctx.font = '500 11px -apple-system,sans-serif';
-            ctx.fillStyle = '#8E8E93';
-            ctx.fillText(labelText, CX, CY - 8);
+            ctx.font = '400 11px -apple-system,sans-serif';
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.fillText(labelEl ? labelEl.textContent : 'Download', CX, CY);
         }
 
         function initSpeedometer() {
