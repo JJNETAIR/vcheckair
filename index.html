@@ -1142,19 +1142,35 @@
         }
 
         // ── UPLOAD: Pure timing — reliable on all devices ────────
-        // ── UPLOAD: fetch timing — most compatible ────────────────
-        async function pureTimingUpload(size) {
-            const data = new Uint8Array(size).fill(65);
-            const t0 = performance.now();
-            try {
-                await fetch(`${CF}/__up?t=${Date.now()}_${Math.random()}`, {
-                    method: 'POST',
-                    body: data,
-                    cache: 'no-store',
-                });
-            } catch(e) {}
-            const elapsed = (performance.now() - t0) / 1000;
-            return elapsed > 0.4 ? (size * 8) / (elapsed * 1e6) : 0;
+        // ── UPLOAD: XHR for iOS, fetch for Android ────────────────
+        function pureTimingUpload(size) {
+            return new Promise(resolve => {
+                const data = new Uint8Array(size).fill(65);
+                const t0 = performance.now();
+
+                if (isIOS) {
+                    // iOS Safari: XHR is more reliable for binary uploads
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', `${CF}/__up?t=${Date.now()}`, true);
+                    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+                    xhr.timeout = 12000;
+                    xhr.onload = xhr.onerror = xhr.ontimeout = () => {
+                        const elapsed = (performance.now() - t0) / 1000;
+                        resolve(elapsed > 0.4 ? (size * 8) / (elapsed * 1e6) : 0);
+                    };
+                    xhr.send(data);
+                } else {
+                    // Android Chrome: fetch works well
+                    fetch(`${CF}/__up?t=${Date.now()}_${Math.random()}`, {
+                        method: 'POST',
+                        body: data,
+                        cache: 'no-store',
+                    }).catch(() => {}).finally(() => {
+                        const elapsed = (performance.now() - t0) / 1000;
+                        resolve(elapsed > 0.4 ? (size * 8) / (elapsed * 1e6) : 0);
+                    });
+                }
+            });
         }
         async function measureUpload() {
             const speedEl = document.getElementById('speed-value');
