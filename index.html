@@ -1150,35 +1150,49 @@
             return el>0.3?(size*8)/(el*1e6):0;
         }
 
+        // ── UPLOAD: Pure timing — reliable on all devices ────────
+        function pureTimingUpload(size) {
+            return new Promise(resolve => {
+                const data = new Uint8Array(size).fill(65);
+                const xhr = new XMLHttpRequest();
+                const t0 = performance.now();
+                xhr.onload = xhr.onerror = xhr.ontimeout = () => {
+                    const elapsed = (performance.now() - t0) / 1000;
+                    resolve(elapsed > 0.4 ? (size * 8) / (elapsed * 1e6) : 0);
+                };
+                xhr.timeout = 12000;
+                xhr.open('POST', `${CF}/__up?t=${Date.now()}_${Math.random()}`, true);
+                xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+                xhr.send(data);
+            });
+        }
+
         async function measureUpload() {
             const speedEl = document.getElementById('speed-value');
-            const phases = [
-                {streams:2, size:3e6, label:'⬆️ Warming up...'},
-                {streams:4, size:5e6, label:'⬆️ Testing upload...'},
-                {streams:6, size:8e6, label:'⬆️ Full upload...'},
-            ];
-            let best = 0;
-            for(const ph of phases){
-                ratingEl.innerHTML = `<span class="px-5 py-2 rounded-full bg-blue-50 text-blue-500 text-sm font-medium">${ph.label}</span>`;
-                // iOS uses fetch timing, Android uses XHR progress
-                const fn = isIOS ? (s=>fetchUpload(s)) : (s=>xhrSingleUpload(s));
-                const results = await Promise.all(Array.from({length:ph.streams},()=>fn(ph.size)));
-                const total = results.reduce((s,v)=>s+v,0);
-                if(total > best){
-                    best = total;
-                    // Gradual animation
+            // Warmup — ignored
+            ratingEl.innerHTML = '<span class="px-5 py-2 rounded-full bg-blue-50 text-blue-500 text-sm font-medium">⬆️ Warming up...</span>';
+            await pureTimingUpload(2e6);
+
+            // 3 sequential rounds — sequential is accurate, parallel inflates
+            const results = [];
+            for (const size of [4e6, 6e6, 8e6]) {
+                ratingEl.innerHTML = '<span class="px-5 py-2 rounded-full bg-blue-50 text-blue-500 text-sm font-medium">⬆️ Testing upload...</span>';
+                const mbps = await pureTimingUpload(size);
+                if (mbps > 1) {
+                    results.push(mbps);
+                    const avg = results.reduce((s,v)=>s+v,0)/results.length;
                     const prev = parseFloat(speedEl.textContent)||0;
-                    const steps = 15;
-                    for(let i=1;i<=steps;i++){
-                        speedEl.textContent = (prev+(best-prev)*(i/steps)).toFixed(1);
+                    for(let i=1;i<=12;i++){
+                        speedEl.textContent=(prev+(avg-prev)*(i/12)).toFixed(1);
                         await new Promise(r=>setTimeout(r,20));
                     }
                 }
             }
-            return best;
+            if(!results.length) return 0;
+            const avg = results.reduce((s,v)=>s+v,0)/results.length;
+            speedEl.textContent = avg.toFixed(1);
+            return avg;
         }
-
-
         async function startSpeedTest() {
             if (isTesting) return;
             isTesting = true;
