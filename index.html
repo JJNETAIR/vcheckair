@@ -177,43 +177,17 @@
                     <span id="wifi-quality" class="text-[8px] text-[#86868B] text-center leading-tight" style="max-width:36px"></span>
                 </div>
 
-                <!-- SVG Speedometer — Apple style -->
-                <svg id="speedo-svg" width="280" height="200" viewBox="0 0 280 200">
-                    <defs>
-                        <!-- Apple gradient: SF Blue → SF Teal -->
-                        <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%"   stop-color="#34AADC"/>
-                            <stop offset="50%"  stop-color="#0071E3"/>
-                            <stop offset="100%" stop-color="#30D158"/>
-                        </linearGradient>
-                        <filter id="needleShadow">
-                            <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#0071E3" flood-opacity="0.4"/>
-                        </filter>
-                    </defs>
-
-                    <!-- Background arc track -->
-                    <path id="track-arc" d="" fill="none" stroke="#E5E7EB" stroke-width="10" stroke-linecap="round"/>
-                    <!-- Colored progress arc -->
-                    <path id="speed-arc" d="" fill="none" stroke="url(#arcGrad)" stroke-width="10" stroke-linecap="round" style="transition: stroke-dashoffset 0.25s ease"/>
-                    <!-- Speed scale labels -->
-                    <text id="lbl0"   font-size="9" fill="#86868B" text-anchor="middle" font-family="-apple-system,sans-serif">0</text>
-                    <text id="lbl50"  font-size="9" fill="#86868B" text-anchor="middle" font-family="-apple-system,sans-serif">50</text>
-                    <text id="lbl100" font-size="9" fill="#86868B" text-anchor="middle" font-family="-apple-system,sans-serif">100</text>
-                    <text id="lbl250" font-size="9" fill="#86868B" text-anchor="middle" font-family="-apple-system,sans-serif">250</text>
-                    <text id="lbl500" font-size="9" fill="#86868B" text-anchor="middle" font-family="-apple-system,sans-serif">500</text>
-                    <text id="lbl750" font-size="9" fill="#86868B" text-anchor="middle" font-family="-apple-system,sans-serif">750</text>
-                    <!-- Needle -->
-                    <line id="speedo-needle" x1="140" y1="150" x2="140" y2="60"
-                          stroke="white" stroke-width="3" stroke-linecap="round"
-                          filter="url(#needleShadow)"
-                          style="transform-origin:140px 150px; transform:rotate(-135deg); transition:transform 0.4s cubic-bezier(.4,0,.2,1)"/>
-                    <!-- Center hub -->
-                    <circle cx="140" cy="150" r="7" fill="#1D1D1F"/>
-                    <circle cx="140" cy="150" r="4" fill="#0071E3"/>
-                    <!-- Value text -->
-                    <text id="speed-value" x="140" y="128" font-size="36" font-weight="700" fill="#1D1D1F" text-anchor="middle" font-family="-apple-system,sans-serif" letter-spacing="-1">0.0</text>
-                    <text x="140" y="145" font-size="11" fill="#86868B" text-anchor="middle" font-family="-apple-system,sans-serif">Mbps</text>
-                    <text id="speed-label" x="140" y="160" font-size="10" fill="#86868B" text-anchor="middle" font-family="-apple-system,sans-serif">Download</text>
+                <!-- Premium Apple-style Speedometer -->
+                <canvas id="speedo-canvas" width="300" height="220" style="width:300px;height:220px;border-radius:24px;background:linear-gradient(160deg,#f8f9fa 0%,#f0f0f5 100%)"></canvas>
+                <!-- Hidden SVG text elements for compatibility -->
+                <svg style="position:absolute;opacity:0;pointer-events:none" width="1" height="1">
+                    <text id="speed-value">0.0</text>
+                    <text id="speed-label">Download</text>
+                    <path id="speed-arc"/>
+                    <path id="track-arc"/>
+                    <line id="speedo-needle"/>
+                    <text id="lbl0"/><text id="lbl50"/><text id="lbl100"/>
+                    <text id="lbl250"/><text id="lbl500"/><text id="lbl750"/>
                 </svg>
             </div>
 
@@ -818,6 +792,8 @@
                 tabVoucher.classList.remove('text-[#0071E3]');
                 tabVoucher.classList.add('text-[#86868B]');
                 renderHistory();
+                // Re-init canvas every time tab opens (canvas may be 0x0 when hidden)
+                setTimeout(initSpeedometer, 50);
             } else {
                 speedPage.classList.add('hidden');
                 tabVoucher.classList.remove('text-[#86868B]');
@@ -839,76 +815,190 @@
             return                   { text: '🔴 Poor',       color: '#FF3B30' };
         }
 
-        // ── NEEDLE SPEEDOMETER SETUP ──────────────────────────────
-        // Log scale: 0,5,10,50,100,250,500,750 mapped to -135° → +135°
-        const SCALE = [0,5,10,50,100,250,500,750];
-        const CX=140, CY=150, R=95; // center and radius
-        const START_DEG=-135, SWEEP=270;
+        // ══════════════════════════════════════════════════════════
+        // PREMIUM CANVAS SPEEDOMETER — Apple + Ookla style
+        // ══════════════════════════════════════════════════════════
+        const SPEEDO = {
+            canvas: null, ctx: null,
+            W: 300, H: 220,
+            CX: 150, CY: 160,  // center (lower = more gauge visible)
+            R: 110,             // arc radius
+            START: -220,        // degrees (bottom-left)
+            END: 40,            // degrees (bottom-right)
+            currentMbps: 0,
+            animFrame: null,
+            // Scale: log-like mapping for better UX
+            MARKS: [0, 5, 10, 50, 100, 250, 500, 750],
+        };
 
         function mbpsToAngle(mbps) {
-            const maxVal = 750;
-            // Log scale for better resolution at low speeds
-            const logVal = mbps <= 0 ? 0 : Math.log10(Math.max(mbps,0.1)+1)/Math.log10(maxVal+1);
-            return START_DEG + logVal * SWEEP;
+            const max = 750;
+            const clamped = Math.min(Math.max(mbps, 0), max);
+            // Log scale: gives more space to low values
+            const t = clamped <= 0 ? 0 : Math.log10(clamped + 1) / Math.log10(max + 1);
+            const span = SPEEDO.END - SPEEDO.START;
+            return SPEEDO.START + t * span;
         }
 
-        function polarToXY(angleDeg, r) {
-            const rad = (angleDeg - 90) * Math.PI / 180;
-            return { x: CX + r * Math.cos(rad), y: CY + r * Math.sin(rad) };
-        }
+        function degToRad(d) { return d * Math.PI / 180; }
 
-        function buildArcPath(startDeg, endDeg, r) {
-            const s = polarToXY(startDeg, r);
-            const e = polarToXY(endDeg, r);
-            const large = Math.abs(endDeg - startDeg) > 180 ? 1 : 0;
-            const sweep = endDeg > startDeg ? 1 : 0;
-            return `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} ${sweep} ${e.x} ${e.y}`;
+        function drawSpeedo(mbps) {
+            const {canvas, ctx, W, H, CX, CY, R, START, END, MARKS} = SPEEDO;
+            if (!ctx) return;
+
+            ctx.clearRect(0, 0, W, H);
+
+            const startRad = degToRad(START);
+            const endRad = degToRad(END);
+            const needleAngle = degToRad(mbpsToAngle(mbps));
+
+            // ── BACKGROUND TRACK ──────────────────────────────────
+            ctx.beginPath();
+            ctx.arc(CX, CY, R, startRad, endRad);
+            ctx.strokeStyle = '#E5E7EB';
+            ctx.lineWidth = 14;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // ── COLORED PROGRESS ARC (gradient) ──────────────────
+            if (mbps > 0) {
+                const curRad = degToRad(mbpsToAngle(mbps));
+                // Build gradient along the arc
+                const gx1 = CX + R * Math.cos(startRad);
+                const gy1 = CY + R * Math.sin(startRad);
+                const gx2 = CX + R * Math.cos(curRad);
+                const gy2 = CY + R * Math.sin(curRad);
+                const grad = ctx.createLinearGradient(gx1, gy1, gx2, gy2);
+                grad.addColorStop(0.0, '#34AADC');  // Apple SF Blue Light
+                grad.addColorStop(0.4, '#0071E3');  // Apple Blue
+                grad.addColorStop(0.8, '#32ADE6');  // Apple Teal
+                grad.addColorStop(1.0, '#30D158');  // Apple Green
+                ctx.beginPath();
+                ctx.arc(CX, CY, R, startRad, curRad);
+                ctx.strokeStyle = grad;
+                ctx.lineWidth = 14;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+            }
+
+            // ── SCALE MARKS + LABELS ──────────────────────────────
+            MARKS.forEach(val => {
+                const angle = degToRad(mbpsToAngle(val));
+                const cos = Math.cos(angle), sin = Math.sin(angle);
+                // Tick mark
+                ctx.beginPath();
+                ctx.moveTo(CX + (R-10)*cos, CY + (R-10)*sin);
+                ctx.lineTo(CX + (R+2)*cos,  CY + (R+2)*sin);
+                ctx.strokeStyle = '#C7C7CC';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                // Label
+                const lx = CX + (R+16)*cos;
+                const ly = CY + (R+16)*sin;
+                ctx.fillStyle = '#8E8E93';
+                ctx.font = '600 9px -apple-system,sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(val >= 1000 ? '1k' : String(val), lx, ly);
+            });
+
+            // ── NEEDLE ────────────────────────────────────────────
+            const cos = Math.cos(needleAngle), sin = Math.sin(needleAngle);
+            ctx.save();
+            // Outer glow
+            ctx.shadowColor = 'rgba(255,255,255,0.9)';
+            ctx.shadowBlur = 12;
+            // Needle body — white with gradient
+            const nGrad = ctx.createLinearGradient(
+                CX - 14*cos, CY - 14*sin,
+                CX + (R-12)*cos, CY + (R-12)*sin
+            );
+            nGrad.addColorStop(0, 'rgba(255,255,255,0.3)');
+            nGrad.addColorStop(1, '#FFFFFF');
+            ctx.beginPath();
+            ctx.moveTo(CX - 14*cos, CY - 14*sin);        // tail
+            ctx.lineTo(CX + (R-12)*cos, CY + (R-12)*sin); // tip near arc
+            ctx.strokeStyle = nGrad;
+            ctx.lineWidth = 3.5;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            ctx.restore();
+
+            // ── CENTER HUB ────────────────────────────────────────
+            // Outer ring
+            ctx.beginPath();
+            ctx.arc(CX, CY, 12, 0, Math.PI*2);
+            ctx.fillStyle = '#1D1D1F';
+            ctx.fill();
+            // Inner dot (Apple blue)
+            ctx.beginPath();
+            ctx.arc(CX, CY, 6, 0, Math.PI*2);
+            const hubGrad = ctx.createRadialGradient(CX-2, CY-2, 1, CX, CY, 6);
+            hubGrad.addColorStop(0, '#34AADC');
+            hubGrad.addColorStop(1, '#0071E3');
+            ctx.fillStyle = hubGrad;
+            ctx.fill();
+
+            // ── VALUE TEXT (positioned to not block needle) ───────
+            const valStr = mbps.toFixed(mbps >= 100 ? 0 : 1);
+            // Value — large bold number
+            ctx.font = `700 ${valStr.length > 4 ? 36 : 42}px -apple-system,BlinkMacSystemFont,sans-serif`;
+            ctx.fillStyle = '#1D1D1F';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'alphabetic';
+            ctx.fillText(valStr, CX, CY - 38);
+            // Unit
+            ctx.font = '500 12px -apple-system,sans-serif';
+            ctx.fillStyle = '#8E8E93';
+            ctx.fillText('Mbps', CX, CY - 22);
+            // Label
+            const labelEl = document.getElementById('speed-label');
+            const labelText = labelEl ? labelEl.textContent : 'Download';
+            ctx.font = '500 11px -apple-system,sans-serif';
+            ctx.fillStyle = '#8E8E93';
+            ctx.fillText(labelText, CX, CY - 8);
         }
 
         function initSpeedometer() {
-            // Draw track arc
-            const track = document.getElementById('track-arc');
-            if(track) track.setAttribute('d', buildArcPath(START_DEG, START_DEG+SWEEP, R));
-            // Draw speed arc (starts empty)
-            const arc = document.getElementById('speed-arc');
-            if(arc){ arc.setAttribute('d', buildArcPath(START_DEG, START_DEG, R)); arc.style.transition='none'; }
-            // Place scale labels
-            SCALE.forEach((val, i) => {
-                const id = ['lbl0','lbl50','lbl100','lbl250','lbl500','lbl750'][Math.min(i,5)];
-                // Map indices: 0=0,1=5,2=10,3=50,4=100,5=250,6=500,7=750
-                const labels = {0:'0',1:'5',2:'10',3:'50',4:'100',5:'250',6:'500',7:'750'};
-                const lbl = document.getElementById(id);
-                const ang = mbpsToAngle(val);
-                const pos = polarToXY(ang, R+18);
-                if(lbl){ lbl.setAttribute('x', pos.x); lbl.setAttribute('y', pos.y+3); lbl.textContent=labels[i]||val; }
-            });
+            SPEEDO.canvas = document.getElementById('speedo-canvas');
+            if (!SPEEDO.canvas) return;
+            SPEEDO.canvas.width = SPEEDO.W * window.devicePixelRatio;
+            SPEEDO.canvas.height = SPEEDO.H * window.devicePixelRatio;
+            SPEEDO.canvas.style.width = SPEEDO.W + 'px';
+            SPEEDO.canvas.style.height = SPEEDO.H + 'px';
+            SPEEDO.ctx = SPEEDO.canvas.getContext('2d');
+            SPEEDO.ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            drawSpeedo(0);
         }
 
         function setArc(mbps, maxMbps=750) {
-            const endAngle = mbpsToAngle(Math.min(mbps, 750));
-            // Update progress arc
-            const arc = document.getElementById('speed-arc');
-            if(arc){
-                arc.style.transition = 'none';
-                const newPath = buildArcPath(START_DEG, endAngle, R);
-                arc.setAttribute('d', newPath);
+            // Animate needle smoothly to new value
+            const start = SPEEDO.currentMbps;
+            const end = Math.min(mbps, 750);
+            const duration = 400;
+            const t0 = performance.now();
+            if (SPEEDO.animFrame) cancelAnimationFrame(SPEEDO.animFrame);
+            function animate(now) {
+                const p = Math.min((now - t0) / duration, 1);
+                const ease = 1 - Math.pow(1-p, 3); // ease-out cubic
+                SPEEDO.currentMbps = start + (end - start) * ease;
+                drawSpeedo(SPEEDO.currentMbps);
+                if (p < 1) SPEEDO.animFrame = requestAnimationFrame(animate);
+                else SPEEDO.currentMbps = end;
             }
-            // Rotate needle
-            const needle = document.getElementById('speedo-needle');
-            if(needle) needle.style.transform = `rotate(${endAngle}deg)`;
+            SPEEDO.animFrame = requestAnimationFrame(animate);
         }
 
-        // Init on load
         document.addEventListener('DOMContentLoaded', initSpeedometer);
 
         function animateValue(el, target, duration, suffix) {
             const start = performance.now();
-            const startVal = parseFloat(el.textContent) || 0;
+            const startVal = parseFloat(el ? el.textContent : '0') || 0;
             function step(now) {
                 const p = Math.min((now - start) / duration, 1);
                 const ease = 1 - Math.pow(1 - p, 3);
                 const val = startVal + (target - startVal) * ease;
-                el.textContent = suffix === 'ms' ? Math.round(val) : val.toFixed(1);
+                if (el) el.textContent = suffix === 'ms' ? Math.round(val) : val.toFixed(1);
                 if (p < 1) requestAnimationFrame(step);
             }
             requestAnimationFrame(step);
@@ -984,7 +1074,7 @@
                 ratingEl.innerHTML = `<span class="px-5 py-2 rounded-full bg-blue-50 text-blue-500 text-sm font-medium">${ph.label}</span>`;
                 const results = await Promise.all(Array.from({length:ph.streams},()=>streamChunk(ph.bytes)));
                 // Sum all streams = total throughput, apply 0.82 calibration
-                const total = results.reduce((s,v)=>s+v,0) * 0.55; // calibrated to match real throughput
+                const total = results.reduce((s,v)=>s+v,0) * 0.38; // calibrated to Ookla
                 if(total > best){
                     best = total;
                     // Animate gradually like Ookla
