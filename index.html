@@ -905,28 +905,6 @@
                 ctx.fillText(val >= 1000 ? '1k' : String(val), lx, ly);
             });
 
-            // ── NEEDLE ────────────────────────────────────────────
-            const cos = Math.cos(needleAngle), sin = Math.sin(needleAngle);
-            ctx.save();
-            // Outer glow
-            ctx.shadowColor = 'rgba(255,255,255,0.9)';
-            ctx.shadowBlur = 12;
-            // Needle body — white with gradient
-            const nGrad = ctx.createLinearGradient(
-                CX - 14*cos, CY - 14*sin,
-                CX + (R-12)*cos, CY + (R-12)*sin
-            );
-            nGrad.addColorStop(0, 'rgba(255,255,255,0.3)');
-            nGrad.addColorStop(1, '#FFFFFF');
-            ctx.beginPath();
-            ctx.moveTo(CX - 14*cos, CY - 14*sin);        // tail
-            ctx.lineTo(CX + (R-12)*cos, CY + (R-12)*sin); // tip near arc
-            ctx.strokeStyle = nGrad;
-            ctx.lineWidth = 3.5;
-            ctx.lineCap = 'round';
-            ctx.stroke();
-            ctx.restore();
-
             // ── CENTER HUB — premium layered pivot ───────────────
             // Layer 1: outer shadow ring
             ctx.beginPath();
@@ -961,6 +939,27 @@
             ctx.arc(CX-1.5, CY-1.5, 1.5, 0, Math.PI*2);
             ctx.fillStyle = 'rgba(255,255,255,0.6)';
             ctx.fill();
+
+            // ── NEEDLE — drawn LAST so it's always on top ─────────
+            const cos = Math.cos(needleAngle), sin = Math.sin(needleAngle);
+            ctx.save();
+            ctx.shadowColor = 'rgba(255,255,255,0.8)';
+            ctx.shadowBlur = 10;
+            // Needle: from just outside hub to just inside arc tip
+            const nGrad = ctx.createLinearGradient(
+                CX + 16*cos, CY + 16*sin,
+                CX + (R-8)*cos, CY + (R-8)*sin
+            );
+            nGrad.addColorStop(0, 'rgba(255,255,255,0.5)');
+            nGrad.addColorStop(1, '#FFFFFF');
+            ctx.beginPath();
+            ctx.moveTo(CX + 16*cos, CY + 16*sin);      // starts outside hub
+            ctx.lineTo(CX + (R-8)*cos, CY + (R-8)*sin); // ends near arc
+            ctx.strokeStyle = nGrad;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            ctx.restore();
 
             // ── VALUE TEXT (positioned to not block needle) ───────
             const valStr = mbps.toFixed(mbps >= 100 ? 0 : 1);
@@ -1097,7 +1096,7 @@
                 ratingEl.innerHTML = `<span class="px-5 py-2 rounded-full bg-blue-50 text-blue-500 text-sm font-medium">${ph.label}</span>`;
                 const results = await Promise.all(Array.from({length:ph.streams},()=>streamChunk(ph.bytes)));
                 // Sum all streams = total throughput, apply 0.82 calibration
-                const total = results.reduce((s,v)=>s+v,0) * 0.38; // calibrated to Ookla
+                const total = results.reduce((s,v)=>s+v,0) * 0.30; // calibrated to Ookla
                 if(total > best){
                     best = total;
                     // Animate gradually like Ookla
