@@ -910,107 +910,52 @@
                 ctx.fillText(String(val), lx, ly);
             });
 
-            // ── OOKLA NEEDLE — fish/leaf shape, dark→silver→dark ─
+            // ── OOKLA NEEDLE — simple flat rectangle ──────────────
             const cos = Math.cos(needleRad), sin = Math.sin(needleRad);
-            const perp = { x: -sin, y: cos }; // perpendicular
+            const perp = { x: -sin, y: cos };
 
-            const needleLen = R - 22;  // total length from center to tip
-            const fatPoint  = needleLen * 0.38; // where needle is widest
-            const maxHW     = 5.5;     // half-width at fattest point
-            const baseHW    = 2.0;     // half-width at center base
-            const tipHW     = 1.2;     // half-width at tip (rounded not sharp)
+            const needleLen = R - 20; // length from center to tip
+            const halfW = 5;          // half-width (flat rectangle)
 
-            // Key points along needle axis
-            const P0 = { x: CX, y: CY }; // base (center)
-            const P1 = { // fattest point
-                x: CX + fatPoint * cos,
-                y: CY + fatPoint * sin
-            };
-            const P2 = { // tip
-                x: CX + needleLen * cos,
-                y: CY + needleLen * sin
-            };
+            // 4 corners of rectangle
+            const x1 = CX + perp.x * halfW;
+            const y1 = CY + perp.y * halfW;
+            const x2 = CX + cos * needleLen + perp.x * halfW;
+            const y2 = CY + sin * needleLen + perp.y * halfW;
+            const x3 = CX + cos * needleLen - perp.x * halfW;
+            const y3 = CY + sin * needleLen - perp.y * halfW;
+            const x4 = CX - perp.x * halfW;
+            const y4 = CY - perp.y * halfW;
 
             ctx.save();
-            ctx.shadowColor = 'rgba(0,0,0,0.22)';
-            ctx.shadowBlur = 8;
-            ctx.shadowOffsetX = 0;
+            ctx.shadowColor = 'rgba(0,0,0,0.25)';
+            ctx.shadowBlur = 6;
+            ctx.shadowOffsetX = 1;
             ctx.shadowOffsetY = 2;
 
-            // ── TOP EDGE: base → fat → tip ────────────────────────
+            // Draw flat rectangle needle
             ctx.beginPath();
-            ctx.moveTo(
-                P0.x + perp.x * baseHW,
-                P0.y + perp.y * baseHW
-            );
-            ctx.bezierCurveTo(
-                P0.x + perp.x * maxHW * 0.8, P0.y + perp.y * maxHW * 0.8,
-                P1.x + perp.x * maxHW,       P1.y + perp.y * maxHW,
-                P1.x + perp.x * maxHW,       P1.y + perp.y * maxHW
-            );
-            ctx.bezierCurveTo(
-                P2.x + perp.x * tipHW * 2,   P2.y + perp.y * tipHW * 2,
-                P2.x + perp.x * tipHW,       P2.y + perp.y * tipHW,
-                P2.x,                         P2.y  // rounded tip
-            );
-            // ── BOTTOM EDGE: tip → fat → base ─────────────────────
-            ctx.bezierCurveTo(
-                P2.x - perp.x * tipHW,       P2.y - perp.y * tipHW,
-                P2.x - perp.x * tipHW * 2,   P2.y - perp.y * tipHW * 2,
-                P1.x - perp.x * maxHW,       P1.y - perp.y * maxHW
-            );
-            ctx.bezierCurveTo(
-                P1.x - perp.x * maxHW,       P1.y - perp.y * maxHW,
-                P0.x - perp.x * maxHW * 0.8, P0.y - perp.y * maxHW * 0.8,
-                P0.x - perp.x * baseHW,      P0.y - perp.y * baseHW
-            );
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.lineTo(x3, y3);
+            ctx.lineTo(x4, y4);
             ctx.closePath();
 
-            // ── FILL: dark base → bright silver middle → dark tip ─
-            const nGrad = ctx.createLinearGradient(P0.x, P0.y, P2.x, P2.y);
-            nGrad.addColorStop(0,    '#4a4a4f');              // dark base
-            nGrad.addColorStop(0.25, 'rgba(160,160,175,0.9)');// brightening
-            nGrad.addColorStop(0.45, '#e8e8ed');              // bright silver peak
-            nGrad.addColorStop(0.65, 'rgba(140,140,158,0.9)');// fading
-            nGrad.addColorStop(1,    '#3a3a3f');              // dark tip
+            // Solid grey/white fill like Ookla logo
+            const nGrad = ctx.createLinearGradient(CX, CY,
+                CX + cos * needleLen, CY + sin * needleLen);
+            nGrad.addColorStop(0,   '#9a9aa0');  // grey at base
+            nGrad.addColorStop(0.3, '#d8d8de');  // lighter
+            nGrad.addColorStop(0.6, '#ebebf0');  // bright white
+            nGrad.addColorStop(1,   '#c0c0c8');  // tip
             ctx.fillStyle = nGrad;
             ctx.fill();
-
-            // ── SHINE LINE on top of needle ───────────────────────
-            ctx.beginPath();
-            ctx.moveTo(P0.x + perp.x*1.2, P0.y + perp.y*1.2);
-            ctx.bezierCurveTo(
-                P1.x + perp.x*2.5, P1.y + perp.y*2.5,
-                P2.x + perp.x*0.8, P2.y + perp.y*0.8,
-                P2.x,              P2.y
-            );
-            ctx.strokeStyle = 'rgba(255,255,255,0.45)';
-            ctx.lineWidth = 1.2;
-            ctx.lineCap = 'round';
-            ctx.stroke();
             ctx.restore();
 
-            // ── CENTER PIVOT — Ookla style small clean dot ────────
-            // Outer ring
+            // No center dot — Ookla logo has none! Clean pivot point
             ctx.beginPath();
-            ctx.arc(CX, CY, 8, 0, Math.PI * 2);
-            const pivotOuter = ctx.createRadialGradient(CX-1,CY-2,0,CX,CY,8);
-            pivotOuter.addColorStop(0, '#e0e0e5');
-            pivotOuter.addColorStop(1, '#b0b0b8');
-            ctx.fillStyle = pivotOuter;
-            ctx.fill();
-            // Inner dot
-            ctx.beginPath();
-            ctx.arc(CX, CY, 4.5, 0, Math.PI * 2);
-            const pivotInner = ctx.createRadialGradient(CX-1,CY-1,0,CX,CY,4.5);
-            pivotInner.addColorStop(0, '#d0d0d8');
-            pivotInner.addColorStop(1, '#909098');
-            ctx.fillStyle = pivotInner;
-            ctx.fill();
-            // Specular highlight
-            ctx.beginPath();
-            ctx.arc(CX-1.5, CY-2, 1.8, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255,255,255,0.65)';
+            ctx.arc(CX, CY, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#ebebf0';
             ctx.fill();
 
             // ── VALUE TEXT ────────────────────────────────────────
