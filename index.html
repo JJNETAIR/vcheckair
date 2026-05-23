@@ -910,51 +910,58 @@
                 ctx.fillText(String(val), lx, ly);
             });
 
-            // ── OOKLA-STYLE TAPERED NEEDLE ────────────────────────
+            // ── OOKLA-STYLE NEEDLE — from center outward only ─────
             const cos = Math.cos(needleRad), sin = Math.sin(needleRad);
-            const px = -sin, py = cos; // perpendicular
-            const baseW = 9;    // fat base like Ookla
-            const tipW  = 1.2;  // sharp tip
-            const baseD = 14;   // short tail behind center
-            const tipD  = R - 22; // stops well before arc edge
+            const px = -sin, py = cos; // perpendicular direction
 
-            const bx = CX - baseD * cos;
-            const by = CY - baseD * sin;
+            // Needle goes FROM center (wide) TO tip (sharp)
+            // No tail behind center!
+            const tipD = R - 20; // tip stops before arc
             const tx = CX + tipD * cos;
             const ty = CY + tipD * sin;
 
+            // Needle shape: triangle from center to tip
+            const baseHalf = 7;  // half-width at center base
+            const tipHalf  = 0.8; // half-width at tip
+
             ctx.save();
-            ctx.shadowColor = 'rgba(0,113,227,0.35)';
-            ctx.shadowBlur = 10;
+            ctx.shadowColor = 'rgba(0,0,0,0.2)';
+            ctx.shadowBlur = 8;
+            ctx.shadowOffsetX = 1;
+            ctx.shadowOffsetY = 1;
 
             ctx.beginPath();
-            ctx.moveTo(bx + px*baseW, by + py*baseW);
-            ctx.lineTo(tx + px*tipW,  ty + py*tipW);
-            ctx.lineTo(tx - px*tipW,  ty - py*tipW);
-            ctx.lineTo(bx - px*baseW, by - py*baseW);
+            // Base (at center) — wide
+            ctx.moveTo(CX + px*baseHalf, CY + py*baseHalf);
+            // Tip — sharp
+            ctx.lineTo(tx + px*tipHalf, ty + py*tipHalf);
+            ctx.lineTo(tx - px*tipHalf, ty - py*tipHalf);
+            // Base other side
+            ctx.lineTo(CX - px*baseHalf, CY - py*baseHalf);
             ctx.closePath();
 
-            const nGrad = ctx.createLinearGradient(bx, by, tx, ty);
-            nGrad.addColorStop(0,   'rgba(180,180,190,0.5)'); // wide base — fades
-            nGrad.addColorStop(0.3, 'rgba(100,100,120,0.85)');
-            nGrad.addColorStop(1,   '#1D1D1F');               // sharp dark tip
+            // Gradient: light at base → dark at tip (Ookla style)
+            const nGrad = ctx.createLinearGradient(CX, CY, tx, ty);
+            nGrad.addColorStop(0,   'rgba(200,200,210,0.9)'); // light base
+            nGrad.addColorStop(0.4, 'rgba(120,120,140,0.95)');// mid
+            nGrad.addColorStop(1,   '#2C2C2E');               // dark tip
             ctx.fillStyle = nGrad;
             ctx.fill();
             ctx.restore();
 
-            // Small base cap circle (Ookla style)
+            // Center pivot circle — clean grey dot like Ookla
             ctx.beginPath();
-            ctx.arc(CX, CY, 6, 0, Math.PI*2);
-            const capGrad = ctx.createRadialGradient(CX-1,CY-1,1,CX,CY,6);
-            capGrad.addColorStop(0, '#E5E5EA');
-            capGrad.addColorStop(1, '#C7C7CC');
-            ctx.fillStyle = capGrad;
+            ctx.arc(CX, CY, 8, 0, Math.PI*2);
+            ctx.fillStyle = '#E5E5EA';
             ctx.fill();
             ctx.beginPath();
-            ctx.arc(CX, CY, 6, 0, Math.PI*2);
-            ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-            ctx.lineWidth = 1;
-            ctx.stroke();
+            ctx.arc(CX, CY, 5, 0, Math.PI*2);
+            ctx.fillStyle = '#AEAEB2';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(CX-1, CY-1, 2, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            ctx.fill();
 
             // ── VALUE TEXT ────────────────────────────────────────
             const valStr = mbps.toFixed(mbps >= 100 ? 0 : 1);
