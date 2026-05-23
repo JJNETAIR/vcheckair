@@ -178,7 +178,7 @@
                 </div>
 
                 <!-- Premium Apple-style Speedometer -->
-                <canvas id="speedo-canvas" width="300" height="220" style="width:300px;height:220px;border-radius:24px;background:linear-gradient(160deg,#f8f9fa 0%,#f0f0f5 100%)"></canvas>
+                <canvas id="speedo-canvas" width="300" height="220" style="width:300px;height:220px"></canvas>
                 <!-- Hidden SVG text elements for compatibility -->
                 <svg style="position:absolute;opacity:0;pointer-events:none" width="1" height="1">
                     <text id="speed-value">0.0</text>
@@ -847,6 +847,9 @@
             if (!ctx) return;
 
             ctx.clearRect(0, 0, W, H);
+            // Transparent background — matches page bg
+            ctx.fillStyle = 'transparent';
+            ctx.fillRect(0, 0, W, H);
 
             const startRad = degToRad(START);
             const endRad = degToRad(END);
@@ -924,19 +927,39 @@
             ctx.stroke();
             ctx.restore();
 
-            // ── CENTER HUB ────────────────────────────────────────
-            // Outer ring
+            // ── CENTER HUB — premium layered pivot ───────────────
+            // Layer 1: outer shadow ring
+            ctx.beginPath();
+            ctx.arc(CX, CY, 14, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
+            ctx.fill();
+            // Layer 2: dark base ring
             ctx.beginPath();
             ctx.arc(CX, CY, 12, 0, Math.PI*2);
-            ctx.fillStyle = '#1D1D1F';
+            const baseGrad = ctx.createRadialGradient(CX-2, CY-3, 1, CX, CY, 12);
+            baseGrad.addColorStop(0, '#3a3a3c');
+            baseGrad.addColorStop(1, '#1c1c1e');
+            ctx.fillStyle = baseGrad;
             ctx.fill();
-            // Inner dot (Apple blue)
+            // Layer 3: chrome ring
             ctx.beginPath();
-            ctx.arc(CX, CY, 6, 0, Math.PI*2);
-            const hubGrad = ctx.createRadialGradient(CX-2, CY-2, 1, CX, CY, 6);
-            hubGrad.addColorStop(0, '#34AADC');
-            hubGrad.addColorStop(1, '#0071E3');
-            ctx.fillStyle = hubGrad;
+            ctx.arc(CX, CY, 8, 0, Math.PI*2);
+            ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            // Layer 4: glowing blue center dot
+            ctx.beginPath();
+            ctx.arc(CX, CY, 5, 0, Math.PI*2);
+            const dotGrad = ctx.createRadialGradient(CX-1, CY-1, 0.5, CX, CY, 5);
+            dotGrad.addColorStop(0, '#64D2FF');   // SF Cyan highlight
+            dotGrad.addColorStop(0.5, '#0071E3'); // Apple Blue
+            dotGrad.addColorStop(1, '#0040A0');   // deep blue edge
+            ctx.fillStyle = dotGrad;
+            ctx.fill();
+            // Layer 5: specular highlight
+            ctx.beginPath();
+            ctx.arc(CX-1.5, CY-1.5, 1.5, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(255,255,255,0.6)';
             ctx.fill();
 
             // ── VALUE TEXT (positioned to not block needle) ───────
