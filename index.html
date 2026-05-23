@@ -910,43 +910,51 @@
                 ctx.fillText(String(val), lx, ly);
             });
 
-            // ── OOKLA-STYLE TAPERED NEEDLE — no center dot ────────
+            // ── OOKLA-STYLE TAPERED NEEDLE ────────────────────────
             const cos = Math.cos(needleRad), sin = Math.sin(needleRad);
-            // Perpendicular direction for needle width
-            const px = -sin, py = cos;
-            const baseW = 5;   // half-width at base
-            const tipW  = 0.5; // half-width at tip
-            const baseD = 30;  // distance from center toward base
-            const tipD  = R - 10; // distance from center toward tip
+            const px = -sin, py = cos; // perpendicular
+            const baseW = 9;    // fat base like Ookla
+            const tipW  = 1.2;  // sharp tip
+            const baseD = 14;   // short tail behind center
+            const tipD  = R - 22; // stops well before arc edge
 
-            // Base point (behind center)
             const bx = CX - baseD * cos;
             const by = CY - baseD * sin;
-            // Tip point (toward arc)
             const tx = CX + tipD * cos;
             const ty = CY + tipD * sin;
 
             ctx.save();
-            // Needle glow
-            ctx.shadowColor = 'rgba(0,113,227,0.4)';
-            ctx.shadowBlur = 12;
+            ctx.shadowColor = 'rgba(0,113,227,0.35)';
+            ctx.shadowBlur = 10;
 
-            // Draw tapered needle shape (like Ookla)
             ctx.beginPath();
-            ctx.moveTo(bx + px*baseW, by + py*baseW);  // base left
-            ctx.lineTo(tx + px*tipW,  ty + py*tipW);   // tip left
-            ctx.lineTo(tx - px*tipW,  ty - py*tipW);   // tip right
-            ctx.lineTo(bx - px*baseW, by - py*baseW);  // base right
+            ctx.moveTo(bx + px*baseW, by + py*baseW);
+            ctx.lineTo(tx + px*tipW,  ty + py*tipW);
+            ctx.lineTo(tx - px*tipW,  ty - py*tipW);
+            ctx.lineTo(bx - px*baseW, by - py*baseW);
             ctx.closePath();
 
-            // Needle gradient: dark base → bright silver tip
             const nGrad = ctx.createLinearGradient(bx, by, tx, ty);
-            nGrad.addColorStop(0,   'rgba(150,150,160,0.6)'); // light base
-            nGrad.addColorStop(0.5, 'rgba(80,80,100,0.9)');   // mid dark
+            nGrad.addColorStop(0,   'rgba(180,180,190,0.5)'); // wide base — fades
+            nGrad.addColorStop(0.3, 'rgba(100,100,120,0.85)');
             nGrad.addColorStop(1,   '#1D1D1F');               // sharp dark tip
             ctx.fillStyle = nGrad;
             ctx.fill();
             ctx.restore();
+
+            // Small base cap circle (Ookla style)
+            ctx.beginPath();
+            ctx.arc(CX, CY, 6, 0, Math.PI*2);
+            const capGrad = ctx.createRadialGradient(CX-1,CY-1,1,CX,CY,6);
+            capGrad.addColorStop(0, '#E5E5EA');
+            capGrad.addColorStop(1, '#C7C7CC');
+            ctx.fillStyle = capGrad;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(CX, CY, 6, 0, Math.PI*2);
+            ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
 
             // ── VALUE TEXT ────────────────────────────────────────
             const valStr = mbps.toFixed(mbps >= 100 ? 0 : 1);
