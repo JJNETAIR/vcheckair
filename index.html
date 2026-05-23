@@ -178,7 +178,7 @@
                 </div>
 
                 <!-- Premium Apple-style Speedometer -->
-                <div style="background:linear-gradient(180deg,#1C1C1E 0%,#111113 100%);border-radius:24px;padding:8px 0 0;box-shadow:0 8px 32px rgba(0,0,0,0.25)">
+                <div style="background:rgba(255,255,255,0.65);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:28px;padding:10px 0 0;box-shadow:0 8px 32px rgba(0,0,0,0.10),inset 0 1px 0 rgba(255,255,255,0.8),0 1px 0 rgba(255,255,255,0.5);border:1px solid rgba(255,255,255,0.6)">
                     <canvas id="speedo-canvas" width="300" height="220" style="width:300px;height:220px;display:block"></canvas>
                 </div>
                 <!-- Hidden SVG text elements for compatibility -->
@@ -853,10 +853,10 @@
             const endRad   = degToRad(END);
             const needleRad = degToRad(mbpsToAngle(mbps));
 
-            // ── TRACK ARC (dark grey like Ookla) ──────────────────
+            // ── TRACK ARC (light for glass bg) ───────────────────
             ctx.beginPath();
             ctx.arc(CX, CY, R, startRad, endRad);
-            ctx.strokeStyle = '#2C2C2E';
+            ctx.strokeStyle = 'rgba(0,0,0,0.08)';
             ctx.lineWidth = 16;
             ctx.lineCap = 'round';
             ctx.stroke();
@@ -880,11 +880,11 @@
                 ctx.lineCap = 'round';
                 ctx.stroke();
 
-                // Arc glow
+                // Arc glow (subtle on glass)
                 ctx.beginPath();
                 ctx.arc(CX, CY, R, startRad, curRad);
-                ctx.strokeStyle = 'rgba(100,210,255,0.15)';
-                ctx.lineWidth = 28;
+                ctx.strokeStyle = 'rgba(0,113,227,0.12)';
+                ctx.lineWidth = 26;
                 ctx.lineCap = 'round';
                 ctx.stroke();
             }
@@ -897,11 +897,11 @@
                 ctx.beginPath();
                 ctx.moveTo(CX + (R-10)*cos, CY + (R-10)*sin);
                 ctx.lineTo(CX + (R+3)*cos,  CY + (R+3)*sin);
-                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx.strokeStyle = 'rgba(0,0,0,0.2)';
                 ctx.lineWidth = 1.5;
                 ctx.stroke();
                 // Label
-                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.fillStyle = 'rgba(0,0,0,0.35)';
                 ctx.font = '600 9px -apple-system,sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -928,8 +928,8 @@
 
             ctx.save();
             // Needle glow
-            ctx.shadowColor = 'rgba(255,255,255,0.6)';
-            ctx.shadowBlur = 15;
+            ctx.shadowColor = 'rgba(0,113,227,0.4)';
+            ctx.shadowBlur = 12;
 
             // Draw tapered needle shape (like Ookla)
             ctx.beginPath();
@@ -941,9 +941,9 @@
 
             // Needle gradient: dark base → bright silver tip
             const nGrad = ctx.createLinearGradient(bx, by, tx, ty);
-            nGrad.addColorStop(0,   'rgba(60,60,65,0.8)');   // dark base
-            nGrad.addColorStop(0.5, 'rgba(180,180,190,0.95)');// mid silver
-            nGrad.addColorStop(1,   '#FFFFFF');               // bright tip
+            nGrad.addColorStop(0,   'rgba(150,150,160,0.6)'); // light base
+            nGrad.addColorStop(0.5, 'rgba(80,80,100,0.9)');   // mid dark
+            nGrad.addColorStop(1,   '#1D1D1F');               // sharp dark tip
             ctx.fillStyle = nGrad;
             ctx.fill();
             ctx.restore();
@@ -951,16 +951,16 @@
             // ── VALUE TEXT ────────────────────────────────────────
             const valStr = mbps.toFixed(mbps >= 100 ? 0 : 1);
             ctx.font = `700 ${valStr.length > 4 ? 34 : 40}px -apple-system,BlinkMacSystemFont,sans-serif`;
-            ctx.fillStyle = '#FFFFFF';
+            ctx.fillStyle = '#1D1D1F';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'alphabetic';
             ctx.fillText(valStr, CX, CY - 32);
-            ctx.font = '400 12px -apple-system,sans-serif';
-            ctx.fillStyle = 'rgba(255,255,255,0.6)';
+            ctx.font = '500 12px -apple-system,sans-serif';
+            ctx.fillStyle = '#8E8E93';
             ctx.fillText('Mbps', CX, CY - 15);
             const labelEl = document.getElementById('speed-label');
-            ctx.font = '400 11px -apple-system,sans-serif';
-            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.font = '500 11px -apple-system,sans-serif';
+            ctx.fillStyle = '#8E8E93';
             ctx.fillText(labelEl ? labelEl.textContent : 'Download', CX, CY);
         }
 
