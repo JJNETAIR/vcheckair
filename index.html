@@ -264,7 +264,14 @@
         }
 
         // 🛡️ DOUBLE-QUOTE SAFE CSV FIELD PARSER
-        function parseCSVLine(text, delimiter) {
+        function backToEntryView() {
+            // Reset form
+            const input = document.getElementById('voucher-input');
+            if (input) input.value = '';
+            renderView('view-entry');
+        }
+
+                function parseCSVLine(text, delimiter) {
             let columns = [];
             let insideQuotes = false;
             let currentColumn = '';
@@ -333,9 +340,145 @@
 
         // 🔔 REMINDER STORAGE MODULE
         function setupNotification(expiryDateString, voucherCode) {
-            // Show notification section — button onclick set by OneSignal handler
             const notifySection = document.getElementById('notification-section');
             if (notifySection) notifySection.classList.remove('hidden');
+        }
+
+        // ── STREAM LIVE VERIFICATION ──────────────────────────────
+        async function streamLiveVerification() {
+            const input = document.getElementById('voucher-input');
+            if (!input) return;
+            const userInput = input.value.replace(/Voucher\s*-\s*/i,'').trim().toLowerCase();
+            if (!userInput) { alert('Please enter your voucher code'); return; }
+
+            renderView('view-loading');
+
+            try {
+                // Google Sheet CSV export URL
+                const SHEET_ID = '1F8TUOpY9vudo9MsTWOwHwLIBKi1P6_ayikucdTjyrbg';
+                const csvEndpoint = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&t=${Date.now()}`;
+
+                const response = await fetch(csvEndpoint);
+                const csvText = await response.text();
+
+                // ── PROPER FULL CSV PARSER (handles multiline quoted fields) ──
+                function parseFullCSV(text) {
+                    const records = [];
+                    let row = [], field = '', inQuotes = false;
+                    for (let i = 0; i < text.length; i++) {
+                        const ch = text[i], next = text[i+1];
+                        if (inQuotes) {
+                            if (ch === '"' && next === '"') { field += '"'; i++; }
+                            else if (ch === '"') { inQuotes = false; }
+                            else { field += ch; }
+                        } else {
+                            if (ch === '"') { inQuotes = true; }
+                            else if (ch === ',') { row.push(field.trim()); field = ''; }
+                            else if (ch === '\n' || (ch === '\r' && next === '\n')) {
+                                row.push(field.trim());
+                                if (row.some(c => c !== '')) records.push(row);
+                                row = []; field = '';
+                                if (ch === '\r') i++;
+                            } else { field += ch; }
+                        }
+                    }
+                    if (field || row.length) { row.push(field.trim()); if (row.some(c => c !== '')) records.push(row); }
+                    return records;
+                }
+
+                const allRows = parseFullCSV(csvText);
+                if (allRows.length < 2) throw new Error('Empty sheet');
+
+                // Fixed columns: A=0 user, B=1 code, C=2 starttime, D=3 status, E=4 Expirationtime
+                const colUser=0, colCode=1, colStart=2, colStatus=3, colExpiry=4;
+
+                let foundVoucher = null;
+                for (let i = 1; i < allRows.length; i++) {
+                    const cols = allRows[i];
+                    if (!cols[colCode]) continue;
+                    const clean = s => (s||'').replace(/[\r\n]+/g,' ').replace(/"+/g,'').trim();
+                    const sheetCode = cols[colCode].replace(/Voucher\s*-\s*/i,'').trim();
+                    if (sheetCode.toLowerCase() === userInput) {
+                        foundVoucher = {
+                            user:       clean(cols[colUser]),
+                            code:       sheetCode.toUpperCase(),
+                            startTime:  clean(cols[colStart]),
+                            status:     clean(cols[colStatus]).toLowerCase(),
+                            expiryText: clean(cols[colExpiry])
+                        };
+                        break;
+                    }
+                }
+
+                if (!foundVoucher) {
+                    alert('Voucher not found. Please check your code. ⚠️');
+                    renderView('view-entry');
+                    return;
+                }
+
+                const sheetSaysValid = foundVoucher.status.includes('valid');
+                const today = new Date();
+                const expiryDate = parseSheetDateString(foundVoucher.expiryText);
+                let daysRemainingText = '--', isExpired = !sheetSaysValid;
+
+                if (expiryDate && !isNaN(expiryDate.getTime())) {
+                    const diffMs = expiryDate.getTime() - today.getTime();
+                    const diffHours = diffMs / (1000*60*60);
+                    const diffDays = Math.floor(diffMs / (1000*60*60*24));
+                    if (diffMs <= 0) { daysRemainingText = 'Expired'; isExpired = true; }
+                    else if (diffHours < 24) { daysRemainingText = `Expires Today (${Math.ceil(diffHours)}h left)`; }
+                    else if (diffDays === 1) { daysRemainingText = 'Expires Tomorrow'; }
+                    else { daysRemainingText = `${diffDays} Days`; }
+                }
+
+                // Populate dashboard
+                document.getElementById('dash-code-display').innerText = foundVoucher.code;
+                document.getElementById('dash-user-text').innerText = foundVoucher.user || '--';
+
+                if (isExpired) {
+                    document.getElementById('notification-section').classList.add('hidden');
+                    document.getElementById('status-icon-active').classList.add('hidden');
+                    document.getElementById('status-icon-expired').classList.remove('hidden');
+                    document.getElementById('dash-status-title').innerText = 'Voucher Inactive';
+                    document.getElementById('dash-status-title').className = 'text-base font-semibold tracking-tight leading-tight text-rose-600';
+                    document.getElementById('dash-status-badge').innerText = foundVoucher.status || 'expired';
+                    document.getElementById('dash-status-badge').className = 'text-xs font-semibold px-3 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-200 capitalize';
+                    document.getElementById('dash-time').innerText = foundVoucher.startTime || '--';
+                    document.getElementById('dash-data').innerText = foundVoucher.expiryText || '--';
+                    document.getElementById('dash-data').className = 'text-xs font-semibold text-right max-w-[200px] text-rose-500';
+                    document.getElementById('dash-speed').innerText = daysRemainingText;
+                    document.getElementById('dash-speed').className = 'text-xs font-medium bg-rose-50 text-rose-500 px-3 py-1 rounded-md';
+                    renderView('view-dashboard');
+                    return;
+                }
+
+                // Active voucher
+                document.getElementById('status-icon-expired').classList.add('hidden');
+                document.getElementById('status-icon-active').classList.remove('hidden');
+                document.getElementById('dash-status-title').innerText = 'Voucher Active';
+                document.getElementById('dash-status-title').className = 'text-base font-semibold tracking-tight leading-tight text-emerald-600';
+                document.getElementById('dash-status-badge').innerText = foundVoucher.status || 'valid';
+                document.getElementById('dash-status-badge').className = 'text-xs font-semibold px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 capitalize';
+                document.getElementById('dash-time').innerText = foundVoucher.startTime || '--';
+                document.getElementById('dash-time').className = 'text-xs font-semibold text-right max-w-[200px] text-gray-900';
+                document.getElementById('dash-data').innerText = foundVoucher.expiryText || '--';
+                document.getElementById('dash-data').className = 'text-xs font-semibold text-right max-w-[200px] text-emerald-700';
+                document.getElementById('dash-speed').innerText = daysRemainingText;
+                document.getElementById('dash-speed').className = 'text-xs font-medium bg-blue-50 text-blue-600 px-3 py-1 rounded-md';
+
+                setupNotification(foundVoucher.expiryText, foundVoucher.code);
+                updateProgressBar(foundVoucher.startTime, foundVoucher.expiryText);
+                const notifyBtn = document.getElementById('notify-me-btn');
+                if (notifyBtn) {
+                    notifyBtn.onclick = () => setupFCMNotification(foundVoucher.code, foundVoucher.expiryText);
+                }
+                renderView('view-dashboard');
+
+            } catch(err) {
+                console.error('Verification error:', err);
+                alert('Connection error. Please check your internet and try again.');
+                renderView('view-entry');
+            }
         }
 
 
