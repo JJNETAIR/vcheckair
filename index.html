@@ -28,6 +28,21 @@
             }
         }
     </script>
+
+    <!-- OneSignal Web Push SDK -->
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <script>
+        window.OneSignalDeferred = window.OneSignalDeferred || [];
+        OneSignalDeferred.push(async function(OneSignal) {
+            await OneSignal.init({
+                appId: "dddcacd5-97ed-4996-ac23-4c542141108a",
+                serviceWorkerParam: { scope: "/" },
+                serviceWorkerPath: "sw.js",
+                notifyButton: { enable: false }, // we use our own notify button
+                allowLocalhostAsSecureOrigin: true,
+            });
+        });
+    </script>
 </head>
 <body class="bg-[#F5F5F7] text-[#1D1D1F] min-h-screen flex flex-col justify-between">
     
@@ -114,7 +129,7 @@
 
             <!-- Notify + Check Another side by side -->
             <div id="notification-section" class="hidden space-y-0">
-                <button id="notify-me-btn" class="w-full py-2.5 px-4 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-600 text-sm font-medium flex items-center justify-center space-x-2 active:scale-95 transition-transform">
+                <button id="notify-me-btn" onclick="setupOneSignalNotification()" class="w-full py-2.5 px-4 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-600 text-sm font-medium flex items-center justify-center space-x-2 active:scale-95 transition-transform">
                     <span>🔔</span><span>Notify Me 1 Day Before Expiry</span>
                 </button>
                 <p id="notify-status" class="text-xs text-center mt-1 text-gray-400 hidden"></p>
@@ -1149,16 +1164,17 @@
                 const t0 = performance.now();
 
                 if (isIOS) {
-                    // iOS Safari: XHR is more reliable for binary uploads
+                    // iOS Safari: use Blob with no Content-Type (avoids CORS preflight)
+                    const blob = new Blob([data]);
                     const xhr = new XMLHttpRequest();
                     xhr.open('POST', `${CF}/__up?t=${Date.now()}`, true);
-                    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+                    // No Content-Type header = simple request = no CORS preflight on iOS
                     xhr.timeout = 12000;
                     xhr.onload = xhr.onerror = xhr.ontimeout = () => {
                         const elapsed = (performance.now() - t0) / 1000;
                         resolve(elapsed > 0.4 ? (size * 8) / (elapsed * 1e6) : 0);
                     };
-                    xhr.send(data);
+                    xhr.send(blob);
                 } else {
                     // Android Chrome: fetch works well
                     fetch(`${CF}/__up?t=${Date.now()}_${Math.random()}`, {
@@ -1278,6 +1294,57 @@
             isTesting = false;
         }
     
+        // ── ONESIGNAL PUSH NOTIFICATION ──────────────────────────
+        async function setupOneSignalNotification() {
+            const btn = document.getElementById('notify-me-btn');
+            const status = document.getElementById('notify-status');
+
+            try {
+                btn.disabled = true;
+                btn.innerHTML = '<span>⏳</span><span>Setting up...</span>';
+
+                // Request permission via OneSignal
+                await new Promise((resolve, reject) => {
+                    if (window.OneSignalDeferred) {
+                        window.OneSignalDeferred.push(async function(OneSignal) {
+                            try {
+                                const permission = await OneSignal.Notifications.requestPermission();
+                                if (permission) {
+                                    // Tag user with voucher expiry info
+                                    await OneSignal.User.addTags({
+                                        voucher_code: document.getElementById('dash-code-display').innerText,
+                                        expiry_date: document.getElementById('dash-data').innerText,
+                                        notify_before: '1'
+                                    });
+                                    resolve(true);
+                                } else {
+                                    reject(new Error('Permission denied'));
+                                }
+                            } catch(e) { reject(e); }
+                        });
+                    } else {
+                        reject(new Error('OneSignal not loaded'));
+                    }
+                });
+
+                // Show success
+                btn.innerHTML = '<span>✅</span><span>Reminder Set!</span>';
+                btn.classList.remove('bg-blue-50/80', 'border-blue-200', 'text-blue-600');
+                btn.classList.add('bg-emerald-50', 'border-emerald-200', 'text-emerald-600');
+
+                status.textContent = '🔔 You'll be notified 1 day before expiry';
+                status.classList.remove('hidden');
+                status.classList.add('text-emerald-500');
+
+            } catch(err) {
+                btn.disabled = false;
+                btn.innerHTML = '<span>🔔</span><span>Notify Me 1 Day Before Expiry</span>';
+                status.textContent = 'Could not enable notifications. Please try again.';
+                status.classList.remove('hidden');
+                console.log('OneSignal error:', err);
+            }
+        }
+
     </script>
 </body>
 </html>
