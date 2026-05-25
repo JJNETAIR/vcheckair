@@ -30,8 +30,10 @@
     </script>
 
 
-    <!-- OneSignal Web Push - loads after app -->
-    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+
+    <!-- Firebase FCM -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
 </head>
 <body class="bg-[#F5F5F7] text-[#1D1D1F] min-h-screen flex flex-col justify-between">
     
@@ -995,34 +997,38 @@
         }
     
 
-        // ── ONESIGNAL INIT — loads after app is ready ─────────────
-        window.OneSignalDeferred = window.OneSignalDeferred || [];
-        function initOneSignal() {
-            OneSignalDeferred.push(async function(OneSignal) {
-                await OneSignal.init({
-                    appId: "dddcacd5-97ed-4996-ac23-4c542141108a",
-                    serviceWorkerParam: { scope: "/" },
-                    serviceWorkerPath: "OneSignalSDKWorker.js",
-                    notifyButton: { enable: false },
-                    allowLocalhostAsSecureOrigin: true,
-                });
-                // Store instance globally for notify button
-                _oneSignalInstance = OneSignal;
-                console.log("OneSignal initialized ✅");
-            });
-        }
-        // Init OneSignal only after page is fully loaded
-        if (document.readyState === 'complete') {
-            initOneSignal();
-        } else {
-            window.addEventListener('load', initOneSignal);
+
+
+
+
+        // ── FIREBASE FCM PUSH NOTIFICATIONS ──────────────────────
+        const firebaseConfig = {
+            apiKey: "AIzaSyCJV-VOwwMqW5tCBROotu0U_Uju0PKyy8Q",
+            authDomain: "apple-air.firebaseapp.com",
+            projectId: "apple-air",
+            storageBucket: "apple-air.firebasestorage.app",
+            messagingSenderId: "714071308022",
+            appId: "1:714071308022:web:c7d61d4df7f1693f3f5ed7"
+        };
+
+        const VAPID_KEY = "BGeRhehk4k_iL9OfCIlKLEzT7RDxYcmkE-Pe1f8xXrAUE95Zhljn1WUsbq3y48lEB3K47yOzizNhXsTZK6oOrDo";
+
+        let fcmMessaging = null;
+
+        function initFirebase() {
+            try {
+                const app = firebase.initializeApp(firebaseConfig);
+                fcmMessaging = firebase.messaging(app);
+                console.log("✅ Firebase FCM ready!");
+            } catch(e) {
+                console.log("Firebase init error:", e.message);
+            }
         }
 
-        // ── ONESIGNAL NOTIFY BUTTON ────────────────────────────────
-        // Store OneSignal instance globally when initialized
-        let _oneSignalInstance = null;
+        // Init Firebase after page loads
+        window.addEventListener('load', initFirebase);
 
-        async function setupOneSignalNotification(voucherCode, expiryText) {
+        async function setupFCMNotification(voucherCode, expiryText) {
             const btn = document.getElementById('notify-me-btn');
             const status = document.getElementById('notify-status');
 
@@ -1030,47 +1036,46 @@
             btn.innerHTML = '<span>⏳</span><span>Setting up...</span>';
 
             try {
-                // Get OneSignal instance — try global first, then wait
-                const OS = _oneSignalInstance || window.OneSignal;
-
-                if (!OS || !OS.Notifications) {
-                    throw new Error('OneSignal not ready. Please try again in a moment.');
+                if (!fcmMessaging) {
+                    throw new Error('Notification service not ready. Please try again.');
                 }
 
-                // Request push permission
-                const granted = await OS.Notifications.requestPermission();
-
-                if (granted) {
-                    // Tag user with voucher info
-                    try {
-                        await OS.User.addTags({
-                            voucher_code: voucherCode || '',
-                            expiry_date: expiryText || '',
-                            notify_before_days: '1'
-                        });
-                    } catch(e) { console.log('Tag error:', e); }
-
-                    // Success UI
-                    btn.innerHTML = '<span>✅</span><span>Reminder Set!</span>';
-                    btn.style.background = '#f0fdf4';
-                    btn.style.borderColor = '#86efac';
-                    btn.style.color = '#16a34a';
-                    status.textContent = "🔔 You'll be notified 1 day before expiry";
-                    status.classList.remove('hidden');
-
-                } else {
-                    throw new Error('Permission denied');
+                // Request permission
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') {
+                    throw new Error('Permission denied. Please allow notifications in browser settings.');
                 }
+
+                // Get FCM token
+                const token = await fcmMessaging.getToken({ vapidKey: VAPID_KEY });
+
+                if (!token) {
+                    throw new Error('Could not get notification token. Try again.');
+                }
+
+                console.log("FCM Token:", token);
+
+                // Save token + voucher info to IndexedDB for reference
+                const db = await new Promise((res, rej) => {
+                    const r = indexedDB.open('AppleAirDB', 1);
+                    r.onsuccess = () => res(r.result);
+                    r.onerror = () => rej(r.error);
+                });
+                const tx = db.transaction('alerts', 'readwrite');
+                tx.objectStore('alerts').put(token, `fcm_token_${voucherCode}`);
+                tx.objectStore('alerts').put(expiryText, `fcm_expiry_${voucherCode}`);
+
+                // Success UI
+                btn.innerHTML = '<span>✅</span><span>Reminder Set!</span>';
+                btn.style.cssText = 'background:#f0fdf4;border-color:#86efac;color:#16a34a';
+                status.textContent = "🔔 You'll be notified 1 day before expiry";
+                status.classList.remove('hidden');
 
             } catch(err) {
-                console.log('Notify error:', err.message);
+                console.log('FCM error:', err.message);
                 btn.disabled = false;
                 btn.innerHTML = '<span>🔔</span><span>Notify Me 1 Day Before Expiry</span>';
-                status.textContent = err.message.includes('not ready')
-                    ? '⚠️ Loading... Please tap again in 3 seconds.'
-                    : err.message.includes('denied')
-                    ? '⚠️ Allow notifications in browser settings.'
-                    : '⚠️ ' + err.message;
+                status.textContent = '⚠️ ' + err.message;
                 status.classList.remove('hidden');
             }
         }
