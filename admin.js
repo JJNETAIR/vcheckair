@@ -22,8 +22,10 @@ function displayAdminPanel() {
     const dashboard = document.getElementById('admin-dashboard');
     dashboard.classList.remove('hidden');
     setTimeout(() => dashboard.classList.remove('opacity-0', 'translate-y-4'), 50);
-    const savedSheet = localStorage.getItem('apple_air_configured_sheet');
-    if (savedSheet && document.getElementById('sheet-url-input')) {
+    // Default sheet URL — always shows even after browser reset
+    const DEFAULT_SHEET = 'https://docs.google.com/spreadsheets/d/1F8TUOpY9vudo9MsTWOwHwLlBKi1P6_ayikucdTjyrbg/edit';
+    const savedSheet = localStorage.getItem('apple_air_configured_sheet') || DEFAULT_SHEET;
+    if (document.getElementById('sheet-url-input')) {
         document.getElementById('sheet-url-input').value = savedSheet;
     }
 }
@@ -45,14 +47,19 @@ async function triggerGoogleSheetSync() {
         if (parsed.length === 0) return displayToast('Sync mapping failed: Empty rows.');
         localStorage.setItem(DB_VOUCHERS_KEY, JSON.stringify(parsed));
         localStorage.setItem('apple_air_configured_sheet', urlInput);
-        displayToast(`Successfully synced ${parsed.length} items!`);
+        displayToast(`✅ Successfully synced ${parsed.length} vouchers!`);
     } catch (e) {
-        displayToast('Sync failed. Check public sharing setup.');
+        console.log('Sync error:', e);
+        alert('Failed to push sync to cloud server.
+
+Make sure your Google Sheet is shared publicly:
+Share → Anyone with link → Viewer');
     }
 }
 
 function parseCsvDataStructure(csvText) {
-    const rows = csvText.split(/?
+    const rows = csvText.split(/
+?
 /);
     if (rows.length <= 1) return [];
     const headers = rows[0].split(',').map(h => h.replace(/^["']|["']$/g, '').trim());
