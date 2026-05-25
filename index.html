@@ -331,308 +331,11 @@
 
         // 🔔 REMINDER STORAGE MODULE
         function setupNotification(expiryDateString, voucherCode) {
+            // Show notification section — button onclick set by OneSignal handler
             const notifySection = document.getElementById('notification-section');
-            const notifyBtn = document.getElementById('notify-me-btn');
-            const notifyStatus = document.getElementById('notify-status');
-            
-            if (!notifySection || !notifyBtn || !notifyStatus) return;
-
-            const storageKeyDate = `alert_date_${voucherCode.toLowerCase()}`;
-            const storageKeyStatus = `alert_status_${voucherCode.toLowerCase()}`;
-
-            notifySection.classList.remove('hidden');
-
-            const dbRequest = indexedDB.open('AppleAirDB', 1);
-            dbRequest.onupgradeneeded = (e) => {
-                const db = e.target.result;
-                if (!db.objectStoreNames.contains('alerts')) db.createObjectStore('alerts');
-            };
-
-            dbRequest.onsuccess = (e) => {
-                const db = e.target.result;
-                const transaction = db.transaction('alerts', 'readonly');
-                const store = transaction.objectStore('alerts');
-                const getReq = store.get(storageKeyDate);
-
-                getReq.onsuccess = () => {
-                    if (getReq.result) {
-                        notifyBtn.innerHTML = '<span>Reminder Scheduled!</span> <span>✅</span>';
-                        notifyBtn.className = "w-full py-3 px-4 rounded-xl bg-green-50/80 border border-green-200 text-green-600 font-medium flex items-center justify-center space-x-2 pointer-events-none";
-                        notifyStatus.innerText = `We will alert you on ${getReq.result}`;
-                        notifyStatus.classList.remove('hidden');
-                    } else {
-                        notifyBtn.innerHTML = '<span>Notify Me 1 Day Before Expiry</span> <span>🔔</span>';
-                        notifyBtn.className = "w-full py-3 px-4 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-600 font-medium flex items-center justify-center space-x-2 active:scale-95 transition-transform";
-                        notifyStatus.classList.add('hidden');
-                    }
-                };
-            };
-
-            notifyBtn.onclick = async () => {
-                if (!('Notification' in window)) {
-                    alert('This browser does not support notifications.');
-                    return;
-                }
-
-                const permission = await Notification.requestPermission();
-                if (permission === 'granted') {
-                    const expiryDate = parseSheetDateString(expiryDateString);
-                    if (!expiryDate) {
-                        alert('Could not parse expiry date.');
-                        return;
-                    }
-
-                    const alertDate = new Date(expiryDate);
-                    alertDate.setDate(alertDate.getDate() - 1);
-                    const alertString = alertDate.toLocaleDateString('en-GB'); 
-
-                    const dbReq = indexedDB.open('AppleAirDB', 1);
-                    dbReq.onsuccess = (event) => {
-                        const db = event.target.result;
-                        const tx = db.transaction('alerts', 'readwrite');
-                        const store = tx.objectStore('alerts');
-                        store.put(alertString, storageKeyDate);
-                        store.put('pending', storageKeyStatus);
-
-                        tx.oncomplete = () => {
-                            notifyBtn.innerHTML = '<span>Reminder Scheduled!</span> <span>✅</span>';
-                            notifyBtn.className = "w-full py-3 px-4 rounded-xl bg-green-50/80 border border-green-200 text-green-600 font-medium flex items-center justify-center space-x-2 pointer-events-none";
-                            notifyStatus.innerText = `We will alert you on ${alertString}`;
-                            notifyStatus.classList.remove('hidden');
-                        };
-                    };
-                } else {
-                    alert("Notification permission denied.");
-                }
-            };
+            if (notifySection) notifySection.classList.remove('hidden');
         }
 
-        // ⚡ LIVE CORRELATION STREAM (With Bulletproof Header Matching)
-        async function streamLiveVerification() {
-            const userInput = document.getElementById('voucher-input').value.trim().toLowerCase();
-            if (!userInput) return alert('Please enter a voucher code.');
-
-            renderView('view-loading');
-
-            try {
-                const cloudResponse = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
-                    headers: { "X-Master-Key": MASTER_KEY }
-                });
-                const cloudData = await cloudResponse.json();
-                const activeUrl = cloudData.record.url;
-
-                if (!activeUrl) throw new Error("Invalid redirect target link.");
-
-                const match = activeUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-                if (!match) throw new Error("Malformed URL hash parameters.");
-                
-                const spreadsheetId = match[1];
-                const csvEndpoint = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=0&cache_bypass=${Date.now()}`;
-
-                const response = await fetch(csvEndpoint);
-                const csvText = await response.text();
-
-                // PROPER FULL-CSV PARSER: handles multiline quoted fields correctly
-                // Google Sheets wraps fields containing newlines in double-quotes e.g.:
-                // "Jun 16, 2026 11:16:37\nam"  — splitting on \n first destroys these
-                function parseFullCSV(text) {
-                    const records = [];
-                    let row = [];
-                    let field = '';
-                    let inQuotes = false;
-                    for (let i = 0; i < text.length; i++) {
-                        const ch = text[i];
-                        const next = text[i + 1];
-                        if (inQuotes) {
-                            if (ch === '"' && next === '"') { field += '"'; i++; }       // escaped quote
-                            else if (ch === '"') { inQuotes = false; }                   // end of quoted field
-                            else { field += ch; }                                        // content inside quotes (incl. newlines)
-                        } else {
-                            if (ch === '"') { inQuotes = true; }                         // start quoted field
-                            else if (ch === ',') { row.push(field.trim()); field = ''; } // next column
-                            else if (ch === '\n' || (ch === '\r' && next === '\n')) { // end of row
-                                row.push(field.trim());
-                                if (row.some(c => c !== '')) records.push(row);
-                                row = []; field = '';
-                                if (ch === '\r') i++;
-                            } else { field += ch; }
-                        }
-                    }
-                    if (field || row.length) { row.push(field.trim()); if (row.some(c => c !== '')) records.push(row); }
-                    return records;
-                }
-
-                const allRows = parseFullCSV(csvText);
-                if (allRows.length < 2) throw new Error('Empty sheet');
-                console.log('v3.0 | Total rows:', allRows.length, '| First row:', allRows[0], '| Second row:', allRows[1]);
-                console.log('Looking for voucher code:', userInput, '| In column index:', 1);
-
-                // Fixed positional columns: A=0 user, B=1 code, C=2 starttime, D=3 status, E=4 Expirationtime
-                const colUser=0, colCode=1, colStart=2, colStatus=3, colExpiry=4;
-
-                let foundVoucher = null;
-
-                for (let i = 1; i < allRows.length; i++) {
-                    const columns = allRows[i];
-                    if (!columns[colCode]) continue;
-
-                    // Strip "Voucher - " prefix so user just types the number
-                    let cleanedSheetCode = columns[colCode].replace(/Voucher\s*-\s*/i, '').trim();
-
-                    if (cleanedSheetCode.toLowerCase() === userInput) {
-                        const clean = s => (s || '').replace(/[\r\n]+/g, ' ').replace(/"+/g, '').trim();
-                        foundVoucher = {
-                            user:       clean(columns[colUser]),
-                            code:       cleanedSheetCode.toUpperCase(),
-                            startTime:  clean(columns[colStart]),
-                            status:     clean(columns[colStatus]).toLowerCase(),
-                            expiryText: clean(columns[colExpiry])
-                        };
-                        break;
-                    }
-                }
-
-                if (!foundVoucher) {
-                    alert("Voucher not found. Please check your code. ⚠️");
-                    renderView('view-entry');
-                    return;
-                }
-
-                // ✅ FIXED: Use the 'status' column from the sheet as the primary validity check
-                // Accept 'valid' anywhere in the status cell (handles extra whitespace/chars)
-                const sheetSaysValid = foundVoucher.status.includes('valid');
-
-                // Also calculate days remaining from Expirationtime for display
-                const today = new Date();
-                const expiryDate = parseSheetDateString(foundVoucher.expiryText);
-                let daysRemainingText = '--';
-                let isExpired = !sheetSaysValid; // trust the sheet's status column
-
-                if (expiryDate && !isNaN(expiryDate.getTime())) {
-                    const timeDiff = expiryDate.getTime() - today.getTime();
-                    const diffInHours = timeDiff / (1000 * 60 * 60);
-                    const diffInDays = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
-                    if (diffInHours <= 0) {
-                        // Already past expiry time
-                        daysRemainingText = `Expired`;
-                        isExpired = true;
-                    } else if (diffInHours < 24) {
-                        // Less than 24 hours left — expires TODAY
-                        const hoursLeft = Math.ceil(diffInHours);
-                        daysRemainingText = `Expires Today (${hoursLeft}h left)`;
-                    } else if (diffInDays === 1) {
-                        daysRemainingText = `Expires Tomorrow`;
-                    } else {
-                        daysRemainingText = `${diffInDays} Days`;
-                    }
-                } else {
-                    daysRemainingText = sheetSaysValid ? 'Active' : 'Expired';
-                }
-
-                // Populate voucher code display
-                document.getElementById('dash-code-display').innerText = foundVoucher.code;
-                document.getElementById('dash-user-text').innerText = foundVoucher.user || '--';
-
-                if (isExpired) {
-                    document.getElementById('notification-section').classList.add('hidden');
-                    document.getElementById('status-icon-active').classList.add('hidden');
-                    document.getElementById('status-icon-expired').classList.remove('hidden');
-
-                    const titleText = document.getElementById('dash-status-title');
-                    titleText.innerText = "Voucher Inactive";
-                    titleText.className = "text-xl font-semibold tracking-tight text-rose-600";
-
-                    // ✅ Show actual sheet values even for expired vouchers
-                    const statusBadge = document.getElementById('dash-status-badge');
-                    statusBadge.innerText = foundVoucher.status || 'expired';
-                    statusBadge.className = "text-sm font-semibold px-3 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-200 capitalize";
-
-                    document.getElementById('dash-time').innerText = foundVoucher.startTime || '--';
-                    document.getElementById('dash-time').className = "text-sm font-semibold text-right max-w-[200px] text-gray-400";
-
-                    document.getElementById('dash-data').innerText = foundVoucher.expiryText || '--';
-                    document.getElementById('dash-data').className = "text-sm font-semibold text-right max-w-[200px] text-rose-500";
-
-                    const speedBadge = document.getElementById('dash-speed');
-                    speedBadge.innerText = daysRemainingText;
-                    speedBadge.className = "text-sm font-medium bg-rose-50 text-rose-500 px-3 py-1 rounded-md";
-
-                    renderView('view-dashboard');
-                    return;
-                }
-
-                // ✅ SUCCESS STATE — show all 4 Google Sheet columns clearly
-                document.getElementById('status-icon-expired').classList.add('hidden');
-                document.getElementById('status-icon-active').classList.remove('hidden');
-
-                const titleText = document.getElementById('dash-status-title');
-                titleText.innerText = "Voucher Active";
-                titleText.className = "text-xl font-semibold tracking-tight text-emerald-600";
-
-                const statusBadge = document.getElementById('dash-status-badge');
-                statusBadge.innerText = foundVoucher.status || 'valid';
-                statusBadge.className = "text-sm font-semibold px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 capitalize";
-
-                document.getElementById('dash-time').innerText = foundVoucher.startTime || '--';
-                document.getElementById('dash-time').className = "text-sm font-semibold text-right max-w-[200px] text-gray-900";
-
-                document.getElementById('dash-data').innerText = foundVoucher.expiryText || '--';
-                document.getElementById('dash-data').className = "text-sm font-semibold text-right max-w-[200px] text-emerald-700";
-
-                const speedBadge = document.getElementById('dash-speed');
-                speedBadge.innerText = daysRemainingText;
-                speedBadge.className = "text-sm font-medium bg-blue-50 text-blue-600 px-3 py-1 rounded-md";
-
-                setupNotification(foundVoucher.expiryText, foundVoucher.code);
-                updateProgressBar(foundVoucher.startTime, foundVoucher.expiryText);
-                // Wire notify button to OneSignal with voucher data
-                const notifyBtn = document.getElementById('notify-me-btn');
-                if (notifyBtn) {
-                    notifyBtn.onclick = () => setupOneSignalNotification(
-                        foundVoucher.code,
-                        foundVoucher.expiryText
-                    );
-                }
-                renderView('view-dashboard');
-
-            } catch (err) {
-                alert("Voucher not valid/Expired  ⚠️");
-                renderView('view-entry');
-            }
-        }
-
-        document.getElementById('voucher-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') streamLiveVerification();
-        });
-
-        function backToEntryView() { 
-            document.getElementById('voucher-input').value = ''; 
-            const notifySection = document.getElementById('notification-section');
-            if (notifySection) notifySection.classList.add('hidden');
-            renderView('view-entry'); 
-        }
-    </script>
-    <script>
-        // ── PWA INSTALL ────────────────────────────────────────────
-        let deferredPrompt = null;
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            document.getElementById('install-container').classList.remove('hidden');
-        });
-        window.addEventListener('appinstalled', () => {
-            document.getElementById('install-container').classList.add('hidden');
-            deferredPrompt = null;
-        });
-        async function installApp() {
-            if (!deferredPrompt) return;
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            if (outcome === 'accepted') {
-                document.getElementById('install-container').classList.add('hidden');
-            }
-            deferredPrompt = null;
-        }
 
         // ── PROGRESS BAR ───────────────────────────────────────────
         function updateProgressBar(startTimeStr, expiryTimeStr) {
@@ -1303,6 +1006,8 @@
                     notifyButton: { enable: false },
                     allowLocalhostAsSecureOrigin: true,
                 });
+                // Store instance globally for notify button
+                _oneSignalInstance = OneSignal;
                 console.log("OneSignal initialized ✅");
             });
         }
@@ -1314,43 +1019,58 @@
         }
 
         // ── ONESIGNAL NOTIFY BUTTON ────────────────────────────────
+        // Store OneSignal instance globally when initialized
+        let _oneSignalInstance = null;
+
         async function setupOneSignalNotification(voucherCode, expiryText) {
             const btn = document.getElementById('notify-me-btn');
             const status = document.getElementById('notify-status');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span>⏳</span><span>Setting up...</span>';
+
             try {
-                btn.disabled = true;
-                btn.innerHTML = '<span>⏳</span><span>Setting up...</span>';
+                // Get OneSignal instance — try global first, then wait
+                const OS = _oneSignalInstance || window.OneSignal;
 
-                await new Promise((resolve, reject) => {
-                    OneSignalDeferred.push(async function(OneSignal) {
-                        try {
-                            const granted = await OneSignal.Notifications.requestPermission();
-                            if (granted) {
-                                // Tag user with voucher info for targeted notifications
-                                await OneSignal.User.addTags({
-                                    voucher_code: voucherCode || '',
-                                    expiry_date: expiryText || '',
-                                    notify_before_days: '1'
-                                });
-                                resolve(true);
-                            } else {
-                                reject(new Error('Permission denied'));
-                            }
-                        } catch(e) { reject(e); }
-                    });
-                });
+                if (!OS || !OS.Notifications) {
+                    throw new Error('OneSignal not ready. Please try again in a moment.');
+                }
 
-                btn.innerHTML = '<span>✅</span><span>Reminder Set!</span>';
-                btn.classList.replace('bg-blue-50/80','bg-emerald-50');
-                btn.classList.replace('border-blue-200','border-emerald-200');
-                btn.classList.replace('text-blue-600','text-emerald-600');
-                status.textContent = "🔔 You'll be notified 1 day before expiry";
-                status.classList.remove('hidden');
+                // Request push permission
+                const granted = await OS.Notifications.requestPermission();
+
+                if (granted) {
+                    // Tag user with voucher info
+                    try {
+                        await OS.User.addTags({
+                            voucher_code: voucherCode || '',
+                            expiry_date: expiryText || '',
+                            notify_before_days: '1'
+                        });
+                    } catch(e) { console.log('Tag error:', e); }
+
+                    // Success UI
+                    btn.innerHTML = '<span>✅</span><span>Reminder Set!</span>';
+                    btn.style.background = '#f0fdf4';
+                    btn.style.borderColor = '#86efac';
+                    btn.style.color = '#16a34a';
+                    status.textContent = "🔔 You'll be notified 1 day before expiry";
+                    status.classList.remove('hidden');
+
+                } else {
+                    throw new Error('Permission denied');
+                }
 
             } catch(err) {
+                console.log('Notify error:', err.message);
                 btn.disabled = false;
                 btn.innerHTML = '<span>🔔</span><span>Notify Me 1 Day Before Expiry</span>';
-                status.textContent = 'Notifications blocked. Please allow in browser settings.';
+                status.textContent = err.message.includes('not ready')
+                    ? '⚠️ Loading... Please tap again in 3 seconds.'
+                    : err.message.includes('denied')
+                    ? '⚠️ Allow notifications in browser settings.'
+                    : '⚠️ ' + err.message;
                 status.classList.remove('hidden');
             }
         }
