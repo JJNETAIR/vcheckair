@@ -31,9 +31,6 @@
 
 
 
-    <!-- Firebase FCM -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
 </head>
 <body class="bg-[#F5F5F7] text-[#1D1D1F] min-h-screen flex flex-col justify-between">
     
@@ -358,8 +355,10 @@
                 const SHEET_ID = '1F8TUOpY9vudo9MsTWOwHwLIBKi1P6_ayikucdTjyrbg';
                 const csvEndpoint = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&t=${Date.now()}`;
 
-                const response = await fetch(csvEndpoint);
+                const response = await fetch(csvEndpoint, { cache: 'no-store' });
+                if (!response.ok) throw new Error(`Sheet fetch failed: ${response.status}`);
                 const csvText = await response.text();
+                if (!csvText || csvText.length < 10) throw new Error('Empty response from sheet');
 
                 // ── PROPER FULL CSV PARSER (handles multiline quoted fields) ──
                 function parseFullCSV(text) {
@@ -1159,17 +1158,20 @@
         let fcmMessaging = null;
 
         function initFirebase() {
+            // Completely silent - never crashes the app
             try {
-                const app = firebase.initializeApp(firebaseConfig);
-                fcmMessaging = firebase.messaging(app);
-                console.log("✅ Firebase FCM ready!");
+                if (typeof firebase !== 'undefined') {
+                    const app = firebase.initializeApp(firebaseConfig);
+                    fcmMessaging = firebase.messaging(app);
+                    console.log("✅ Firebase FCM ready!");
+                }
             } catch(e) {
-                console.log("Firebase init error:", e.message);
+                console.log("Firebase init error (non-critical):", e.message);
             }
         }
 
-        // Init Firebase after page loads
-        window.addEventListener('load', initFirebase);
+        // Init Firebase after page loads - non-blocking
+        setTimeout(initFirebase, 2000);
 
         async function setupFCMNotification(voucherCode, expiryText) {
             const btn = document.getElementById('notify-me-btn');
@@ -1224,5 +1226,9 @@
         }
 
     </script>
+
+    <!-- Firebase FCM — loaded last, non-blocking -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js" async></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js" async></script>
 </body>
 </html>
