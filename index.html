@@ -1159,55 +1159,54 @@
         async function setupFCMNotification(voucherCode, expiryText) {
             const btn = document.getElementById('notify-me-btn');
             const status = document.getElementById('notify-status');
-
             btn.disabled = true;
             btn.innerHTML = '<span>⏳</span><span>Setting up...</span>';
-
             try {
-                if (!fcmMessaging) {
-                    throw new Error('Notification service not ready. Please try again.');
-                }
-
                 // Request permission
                 const permission = await Notification.requestPermission();
-                if (permission !== 'granted') {
-                    throw new Error('Permission denied. Please allow notifications in browser settings.');
-                }
+                if (permission !== 'granted') throw new Error('Please allow notifications in browser settings.');
 
-                // Get FCM token
-                const token = await fcmMessaging.getToken({ vapidKey: VAPID_KEY });
+                // Calculate alert date (1 day before expiry)
+                const expiryDate = parseSheetDateString(expiryText);
+                if (!expiryDate || isNaN(expiryDate.getTime())) throw new Error('Could not read expiry date.');
+                const alertDate = new Date(expiryDate.getTime() - 24*60*60*1000);
+                const alertDateStr = alertDate.toLocaleDateString('en-GB');
+                const code = voucherCode.toLowerCase();
 
-                if (!token) {
-                    throw new Error('Could not get notification token. Try again.');
-                }
-
-                console.log("FCM Token:", token);
-
-                // Save token + voucher info to IndexedDB for reference
-                const db = await new Promise((res, rej) => {
-                    const r = indexedDB.open('AppleAirDB', 1);
-                    r.onsuccess = () => res(r.result);
-                    r.onerror = () => rej(r.error);
+                // Save to IndexedDB
+                await new Promise((resolve, reject) => {
+                    const req = indexedDB.open('AppleAirDB', 1);
+                    req.onupgradeneeded = e => { if(!e.target.result.objectStoreNames.contains('alerts')) e.target.result.createObjectStore('alerts'); };
+                    req.onsuccess = e => {
+                        const db = e.target.result;
+                        const tx = db.transaction('alerts', 'readwrite');
+                        tx.objectStore('alerts').put(alertDateStr, `alert_date_${code}`);
+                        tx.objectStore('alerts').put('pending', `alert_status_${code}`);
+                        tx.oncomplete = () => { db.close(); resolve(); };
+                        tx.onerror = () => reject(tx.error);
+                    };
+                    req.onerror = () => reject(req.error);
                 });
-                const tx = db.transaction('alerts', 'readwrite');
-                tx.objectStore('alerts').put(token, `fcm_token_${voucherCode}`);
-                tx.objectStore('alerts').put(expiryText, `fcm_expiry_${voucherCode}`);
+
+                // Show instant confirmation notification
+                new Notification('Apple Air WiFi 🔔', {
+                    body: `Reminder set! We will alert you on ${alertDateStr}`,
+                    icon: '/icons/icon-192.png'
+                });
 
                 // Success UI
                 btn.innerHTML = '<span>✅</span><span>Reminder Set!</span>';
-                btn.style.cssText = 'background:#f0fdf4;border-color:#86efac;color:#16a34a';
-                status.textContent = "🔔 You'll be notified 1 day before expiry";
+                btn.style.cssText = 'background:#f0fdf4;border:1px solid #86efac;color:#16a34a;width:100%;padding:10px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:500';
+                status.textContent = `🔔 We will alert you on ${alertDateStr}`;
+                status.style.color = '#16a34a';
                 status.classList.remove('hidden');
-
             } catch(err) {
-                console.log('FCM error:', err.message);
                 btn.disabled = false;
                 btn.innerHTML = '<span>🔔</span><span>Notify Me 1 Day Before Expiry</span>';
                 status.textContent = '⚠️ ' + err.message;
                 status.classList.remove('hidden');
             }
         }
-
         // ── APPS SCRIPT URL ─────────────────────────────────────
         const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyU6qNPSw1R2sCfXHFq_2W7aGyXEaWLjaYIYQ-i7VJVbpOqenz98WE7-7t7uEb6uXVp/exec';
 
