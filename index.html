@@ -56,12 +56,28 @@
                 <button onclick="streamLiveVerification()" class="w-full py-4 bg-[#0071E3] hover:bg-[#0077ED] text-white font-medium rounded-2xl shadow-md">Check Validity</button>
             </div>
             <!-- Install App Button -->
-            <div id="install-container" class="hidden">
+            <div id="install-container" class="hidden space-y-2">
                 <button onclick="installApp()" class="w-full py-3 px-4 rounded-xl bg-gray-50 border border-gray-200 text-gray-700 font-medium flex items-center justify-center space-x-2 active:scale-95 transition-transform">
                     <span>📲</span>
-                    <span>Install Apple Air App</span>
+                    <span id="install-btn-text">Install Apple Air App</span>
                 </button>
-                <p class="text-[11px] text-center text-[#86868B] mt-1.5">Add to Home Screen for quick access</p>
+                <p class="text-[11px] text-center text-[#86868B]">Add to Home Screen for quick access</p>
+                <div id="ios-install-guide" class="hidden bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700 space-y-1">
+                    <p class="font-semibold">📱 Install on iPhone/iPad/Mac:</p>
+                    <p>1. Tap the <strong>Share</strong> button ⬆️</p>
+                    <p>2. Scroll down → tap <strong>"Add to Home Screen"</strong></p>
+                    <p>3. Tap <strong>"Add"</strong> ✅</p>
+                </div>
+            </div>
+
+            <!-- Alerts + Service buttons -->
+            <div class="flex gap-2">
+                <button onclick="setupAlerts()" id="alerts-btn" class="flex-1 py-3 px-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-700 font-medium flex items-center justify-center gap-2 active:scale-95 transition-transform text-sm">
+                    <span>📥</span><span>Alerts</span>
+                </button>
+                <button onclick="openServiceForm()" class="flex-1 py-3 px-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-700 font-medium flex items-center justify-center gap-2 active:scale-95 transition-transform text-sm">
+                    <span>📤</span><span>Service</span>
+                </button>
             </div>
         </div>
 
@@ -639,6 +655,170 @@
         if (navigator.connection) {
             navigator.connection.addEventListener('change', updateWifiSignal);
         }
+
+        // ── APPS SCRIPT URL — paste your deployed URL here ────────
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyU6qNPSw1R2sCfXHFq_2W7aGyXEaWLjaYIYQ-i7VJVbpOqenz98WE7-7t7uEb6uXVp/exec';
+
+        // ── ALERTS (Firebase FCM Subscribe) ────────────────────────
+        async function setupAlerts() {
+            const btn = document.getElementById('alerts-btn');
+            try {
+                btn.disabled = true;
+                btn.innerHTML = '<span>⏳</span><span>Setting up...</span>';
+
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') throw new Error('denied');
+
+                // Try Firebase FCM
+                if (fcmMessaging) {
+                    const token = await fcmMessaging.getToken({ vapidKey: VAPID_KEY });
+                    if (token) {
+                        console.log('FCM subscribed:', token.substring(0,20)+'...');
+                        localStorage.setItem('fcm_subscribed', 'true');
+                    }
+                }
+
+                btn.innerHTML = '<span>✅</span><span>Alerts On</span>';
+                btn.style.cssText = 'flex:1;background:#f0fdf4;border:1px solid #86efac;color:#16a34a;border-radius:12px;padding:12px;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:8px';
+
+            } catch(e) {
+                btn.disabled = false;
+                btn.innerHTML = '<span>📥</span><span>Alerts</span>';
+                btn.style = '';
+                if (e.message === 'denied') {
+                    alert('Please allow notifications in your browser settings to receive alerts.');
+                }
+            }
+        }
+
+        // Check if already subscribed on load
+        window.addEventListener('load', () => {
+            if (localStorage.getItem('fcm_subscribed') === 'true') {
+                const btn = document.getElementById('alerts-btn');
+                if (btn) {
+                    btn.innerHTML = '<span>✅</span><span>Alerts On</span>';
+                    btn.style.cssText = 'flex:1;background:#f0fdf4;border:1px solid #86efac;color:#16a34a;border-radius:12px;padding:12px;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:8px';
+                }
+            }
+        });
+
+        // ── SERVICE FORM ────────────────────────────────────────────
+        function openServiceForm() {
+            document.getElementById('view-service').classList.remove('hidden');
+        }
+
+        function closeServiceForm() {
+            document.getElementById('view-service').classList.add('hidden');
+            // Reset form
+            document.getElementById('svc-name').value = '';
+            document.getElementById('svc-code').value = '';
+            document.getElementById('svc-issue').value = '';
+            document.getElementById('svc-message').value = '';
+            document.getElementById('svc-status').classList.add('hidden');
+            const btn = document.getElementById('svc-submit');
+            btn.disabled = false;
+            btn.textContent = 'Send Request 📤';
+        }
+
+        async function submitServiceRequest() {
+            const name    = document.getElementById('svc-name').value.trim();
+            const code    = document.getElementById('svc-code').value.trim();
+            const issue   = document.getElementById('svc-issue').value;
+            const message = document.getElementById('svc-message').value.trim();
+            const status  = document.getElementById('svc-status');
+            const btn     = document.getElementById('svc-submit');
+
+            // Validate
+            if (!name)    { alert('Please enter your name'); return; }
+            if (!code)    { alert('Please enter your voucher code'); return; }
+            if (!issue)   { alert('Please select an issue type'); return; }
+            if (!message) { alert('Please describe your issue'); return; }
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Sending...';
+            status.classList.add('hidden');
+
+            try {
+                if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('PASTE_YOUR')) {
+                    throw new Error('Service URL not configured yet.');
+                }
+
+                const response = await fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, voucherCode: code, issueType: issue, message })
+                });
+
+                // Success (no-cors mode always returns opaque response)
+                btn.textContent = '✅ Request Sent!';
+                btn.style.background = '#16a34a';
+                status.textContent = '✅ Your request has been submitted! We will contact you soon.';
+                status.classList.remove('hidden');
+                status.style.color = '#16a34a';
+
+                // Auto close after 3 seconds
+                setTimeout(closeServiceForm, 3000);
+
+            } catch(err) {
+                btn.disabled = false;
+                btn.textContent = 'Send Request 📤';
+                status.textContent = '⚠️ ' + err.message;
+                status.classList.remove('hidden');
+                status.style.color = '#dc2626';
+            }
+        }
+
+        // ── PWA INSTALL ────────────────────────────────────────────
+        let deferredPrompt = null;
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        const isMac = /Macintosh/.test(navigator.userAgent) && 'ontouchend' in document;
+        const isInstalled = window.matchMedia('(display-mode: standalone)').matches;
+
+        // Android/Windows/Mac Chrome — show install button
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            if (!isInstalled) {
+                document.getElementById('install-container').classList.remove('hidden');
+            }
+        });
+
+        window.addEventListener('appinstalled', () => {
+            document.getElementById('install-container').classList.add('hidden');
+            deferredPrompt = null;
+        });
+
+        async function installApp() {
+            if (deferredPrompt) {
+                // Android / Windows / Mac Chrome
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    document.getElementById('install-container').classList.add('hidden');
+                }
+                deferredPrompt = null;
+            } else if (isIOS || isMac) {
+                // iOS Safari / Mac Safari — show manual guide
+                showIOSInstallGuide();
+            }
+        }
+
+        function showIOSInstallGuide() {
+            const guide = document.getElementById('ios-install-guide');
+            if (guide) {
+                guide.classList.toggle('hidden');
+            }
+        }
+
+        // Show iOS install hint automatically on iOS if not installed
+        window.addEventListener('load', () => {
+            if ((isIOS || isMac) && !isInstalled) {
+                document.getElementById('install-container').classList.remove('hidden');
+                const btn = document.getElementById('install-btn-text');
+                if (btn) btn.textContent = 'Add to Home Screen';
+            }
+        });
 
         // ── TAB SWITCHING ──────────────────────────────────────────
         function switchTab(tab) {
