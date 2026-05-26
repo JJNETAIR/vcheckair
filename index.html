@@ -1155,34 +1155,6 @@
 
 
         // ── FIREBASE FCM PUSH NOTIFICATIONS ──────────────────────
-        const firebaseConfig = {
-            apiKey: "AIzaSyCJV-VOwwMqW5tCBROotu0U_Uju0PKyy8Q",
-            authDomain: "apple-air.firebaseapp.com",
-            projectId: "apple-air",
-            storageBucket: "apple-air.firebasestorage.app",
-            messagingSenderId: "714071308022",
-            appId: "1:714071308022:web:c7d61d4df7f1693f3f5ed7"
-        };
-
-        const VAPID_KEY = "BGeRhehk4k_iL9OfCIlKLEzT7RDxYcmkE-Pe1f8xXrAUE95Zhljn1WUsbq3y48lEB3K47yOzizNhXsTZK6oOrDo";
-
-        let fcmMessaging = null;
-
-        function initFirebase() {
-            // Completely silent - never crashes the app
-            try {
-                if (typeof firebase !== 'undefined') {
-                    const app = firebase.initializeApp(firebaseConfig);
-                    fcmMessaging = firebase.messaging(app);
-                    console.log("✅ Firebase FCM ready!");
-                }
-            } catch(e) {
-                console.log("Firebase init error (non-critical):", e.message);
-            }
-        }
-
-        // Init Firebase after page loads - non-blocking
-        setTimeout(initFirebase, 2000);
 
         async function setupFCMNotification(voucherCode, expiryText) {
             const btn = document.getElementById('notify-me-btn');
