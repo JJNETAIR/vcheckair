@@ -32,7 +32,7 @@ messaging.onBackgroundMessage((payload) => {
 });
 
 // ── CACHING ──────────────────────────────────────────────────────────
-const CACHE_NAME = 'apple-air-v2-cache';
+const CACHE_NAME = 'apple-air-v5-cache'; // bumped to force fresh install
 const ASSETS = ['/', '/index.html', '/admin.html'];
 
 self.addEventListener('install', (e) => {
