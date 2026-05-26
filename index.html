@@ -1189,10 +1189,22 @@
                 });
 
                 // Show instant confirmation notification
-                new Notification('Apple Air WiFi 🔔', {
-                    body: `Reminder set! We will alert you on ${alertDateStr}`,
-                    icon: '/icons/icon-192.png'
-                });
+                // iOS: new Notification() works
+                // Android: must use ServiceWorker showNotification()
+                try {
+                    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                        const reg = await navigator.serviceWorker.ready;
+                        await reg.showNotification('Apple Air WiFi 🔔', {
+                            body: `Reminder set! We will alert you on ${alertDateStr}`,
+                            icon: '/icons/icon-192.png'
+                        });
+                    } else {
+                        new Notification('Apple Air WiFi 🔔', {
+                            body: `Reminder set! We will alert you on ${alertDateStr}`,
+                            icon: '/icons/icon-192.png'
+                        });
+                    }
+                } catch(e) { console.log('Notification display:', e.message); }
 
                 // Success UI
                 btn.innerHTML = '<span>✅</span><span>Reminder Set!</span>';
