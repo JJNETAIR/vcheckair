@@ -58,28 +58,50 @@ Share → Anyone with link → Viewer');
 }
 
 function parseCsvDataStructure(csvText) {
-    const rows = csvText.split(/
-?
-/);
-    if (rows.length <= 1) return [];
-    const headers = rows[0].split(',').map(h => h.replace(/^["']|["']$/g, '').trim());
+    // Proper CSV parser handles multiline quoted fields from Google Sheets
     const records = [];
-
-    for (let i = 1; i < rows.length; i++) {
-        if (!rows[i].trim()) continue;
-        const cols = rows[i].split(',').map(c => c.replace(/^["']|["']$/g, '').trim());
-        const rec = {};
-        headers.forEach((h, idx) => rec[h] = cols[idx] || '');
-        if (rec.code) {
-            records.push({
-                code: rec.code.toUpperCase(),
-                timeRemaining: rec.timeRemaining || '24 Hours',
-                dataAllowance: rec.dataAllowance || 'Unlimited GB',
-                speedTier: rec.speedTier || '350 Mbps Profile'
-            });
+    let row = [], field = '', inQ = false;
+    for (let i = 0; i < csvText.length; i++) {
+        const ch = csvText[i], nx = csvText[i+1];
+        if (inQ) {
+            if (ch==='"' && nx==='"') { field+='"'; i++; }
+            else if (ch==='"') { inQ=false; }
+            else field+=ch;
+        } else {
+            if (ch==='"') { inQ=true; }
+            else if (ch===',') { row.push(field.trim()); field=''; }
+            else if (ch==='
+'||(ch==='
+'&&nx==='
+')) {
+                row.push(field.trim());
+                if (row.some(c=>c!=='')) records.push(row);
+                row=[]; field='';
+                if(ch==='
+') i++;
+            } else field+=ch;
         }
     }
-    return records;
+    if (field||row.length){ row.push(field.trim()); if(row.some(c=>c!=='')) records.push(row); }
+    if (records.length < 2) return [];
+
+    // Sheet layout: A=user, B=code, C=starttime, D=status, E=Expirationtime
+    const result = [];
+    for (let i = 1; i < records.length; i++) {
+        const cols = records[i];
+        const code = (cols[1]||'').replace(/Voucher\s*-\s*/i,'').trim();
+        if (!code) continue;
+        const clean = s => (s||'').replace(/[
+]+/g,' ').replace(/"+/g,'').trim();
+        result.push({
+            user:       clean(cols[0]),
+            code:       code.toUpperCase(),
+            startTime:  clean(cols[2]),
+            status:     clean(cols[3]),
+            expiryText: clean(cols[4])
+        });
+    }
+    return result;
 }
 
 function processManualProvisioning() {
