@@ -1231,10 +1231,9 @@
 
                 // Get FCM token and save to Google Sheet for Vercel Cron
                 try {
-                    if (fcmMessaging) {
-                        const fcmToken = await fcmMessaging.getToken({ vapidKey: VAPID_KEY });
+                    if (window.fcmMessaging) {
+                        const fcmToken = await window.fcmMessaging.getToken({ vapidKey: VAPID_KEY });
                         if (fcmToken) {
-                            // Save token to Google Sheet via Apps Script
                             await fetch(APPS_SCRIPT_URL, {
                                 method: 'POST',
                                 mode: 'no-cors',
@@ -1250,27 +1249,6 @@
                         }
                     }
                 } catch(e) { console.log('Token save (non-critical):', e.message); }
-
-
-                // Get FCM token and save to Google Sheet for Vercel Cron
-                try {
-                    if (fcmMessaging) {
-                        const fcmToken = await fcmMessaging.getToken({ vapidKey: VAPID_KEY });
-                        if (fcmToken) {
-                            await fetch(APPS_SCRIPT_URL, {
-                                method: 'POST', mode: 'no-cors',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    type: 'token',
-                                    voucherCode: voucherCode.toUpperCase(),
-                                    fcmToken: fcmToken,
-                                    expiryDate: expiryText
-                                })
-                            });
-                            console.log('FCM token saved to sheet');
-                        }
-                    }
-                } catch(e) { console.log('Token save non-critical:', e.message); }
 
                 // Show instant confirmation notification
                 // iOS: new Notification() works
@@ -1309,12 +1287,12 @@
         // ── FIREBASE ─────────────────────────────────────────────
         const firebaseConfig = {apiKey:"AIzaSyCJV-VOwwMqW5tCBROotu0U_Uju0PKyy8Q",authDomain:"apple-air.firebaseapp.com",projectId:"apple-air",storageBucket:"apple-air.firebasestorage.app",messagingSenderId:"714071308022",appId:"1:714071308022:web:c7d61d4df7f1693f3f5ed7"};
         const VAPID_KEY = "BGeRhehk4k_iL9OfCIlKLEzT7RDxYcmkE-Pe1f8xXrAUE95Zhljn1WUsbq3y48lEB3K47yOzizNhXsTZK6oOrDo";
-        let fcmMessaging = null;
+        window.fcmMessaging = null;
         function initFirebase() {
             try {
                 if (typeof firebase !== 'undefined') {
                     firebase.initializeApp(firebaseConfig);
-                    fcmMessaging = firebase.messaging();
+                    window.fcmMessaging = firebase.messaging();
                     console.log('✅ Firebase ready!');
                 }
             } catch(e) { console.log('Firebase init:', e.message); }
@@ -1364,7 +1342,7 @@
                 btn.disabled=true; btn.textContent='⏳ Setting up...';
                 const p=await Notification.requestPermission();
                 if(p!=='granted') throw new Error('denied');
-                if(fcmMessaging){const t=await fcmMessaging.getToken({vapidKey:VAPID_KEY});if(t) localStorage.setItem('fcm_subscribed','true');}
+                if(window.fcmMessaging){const t=await window.fcmMessaging.getToken({vapidKey:VAPID_KEY});if(t) localStorage.setItem('fcm_subscribed','true');}
                 btn.textContent='✅ Alerts On';
                 btn.style.cssText='flex:1;background:#f0fdf4;border:1px solid #86efac;color:#16a34a;border-radius:12px;padding:12px;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:8px';
             } catch(e) {
