@@ -35,6 +35,20 @@
             </div>
         </div>
 
+        <!-- Tab Buttons (shown after login) -->
+        <div id="admin-tabs" class="hidden w-full mb-2">
+            <div class="flex bg-gray-100 rounded-2xl p-1 gap-1 max-w-xs">
+                <button id="tab-voucher" onclick="showTab('voucher')"
+                    class="flex-1 py-2 text-xs font-medium rounded-xl bg-white shadow-sm text-gray-800 transition-all">
+                    📋 Vouchers
+                </button>
+                <button id="tab-broadcast" onclick="showTab('broadcast')"
+                    class="flex-1 py-2 text-xs font-medium rounded-xl text-gray-400 transition-all">
+                    📣 Broadcast
+                </button>
+            </div>
+        </div>
+
         <div id="admin-dashboard" class="w-full space-y-8 hidden opacity-0 transform translate-y-4 transition-all duration-300">
             <div>
                 <h1 class="text-2xl font-semibold tracking-tight">Voucher Provisioning</h1>
@@ -64,6 +78,46 @@
                     </div>
                 </div>
             </div>
+        <!-- ── BROADCAST NOTIFICATION SECTION ── -->
+        <div id="broadcast-section" class="w-full hidden">
+            <div class="mb-6">
+                <h1 class="text-2xl font-semibold tracking-tight">📣 Broadcast Notification</h1>
+                <p class="text-xs text-[#86868B] mt-1">Send a custom push notification to all subscribed customers instantly.</p>
+            </div>
+
+            <div class="bg-white border border-gray-200/60 rounded-3xl p-6 shadow-apple space-y-4 max-w-lg">
+                <div class="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center text-lg">🔔</div>
+                <h3 class="text-base font-semibold">Send to All Customers</h3>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-xs font-medium text-gray-600 mb-1 block">Notification Title</label>
+                        <input type="text" id="broadcast-title" placeholder="e.g. Apple Air WiFi 🎉"
+                            class="w-full px-4 py-3 bg-[#F5F5F7] border border-transparent rounded-xl text-xs focus:outline-none focus:border-orange-400 focus:bg-white" />
+                    </div>
+                    <div>
+                        <label class="text-xs font-medium text-gray-600 mb-1 block">Message</label>
+                        <textarea id="broadcast-body" rows="3" placeholder="e.g. Eid Mubarak! 🌙 Wishing you and your family a blessed celebration."
+                            class="w-full px-4 py-3 bg-[#F5F5F7] border border-transparent rounded-xl text-xs focus:outline-none focus:border-orange-400 focus:bg-white resize-none"></textarea>
+                    </div>
+                </div>
+
+                <!-- Preview -->
+                <div class="bg-gray-50 border border-gray-100 rounded-2xl p-4 space-y-1">
+                    <p class="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">Preview</p>
+                    <p id="preview-title" class="text-xs font-semibold text-gray-800">Apple Air WiFi 🎉</p>
+                    <p id="preview-body" class="text-xs text-gray-500">Your message will appear here...</p>
+                </div>
+
+                <button onclick="sendBroadcast()" id="broadcast-btn"
+                    class="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors">
+                    🚀 Send to All Customers
+                </button>
+
+                <div id="broadcast-result" class="hidden text-center text-xs font-medium py-2 rounded-xl"></div>
+            </div>
+        </div>
+
         </div>
     </main>
 
@@ -88,6 +142,7 @@
         async function displayAdminPanel() {
             document.getElementById('admin-auth-gate').classList.add('hidden');
             document.getElementById('btn-logout').classList.remove('hidden');
+            document.getElementById('admin-tabs').classList.remove('hidden');
             const d = document.getElementById('admin-dashboard');
             d.classList.remove('hidden');
             setTimeout(() => { d.classList.remove('opacity-0', 'translate-y-4'); }, 50);
@@ -130,6 +185,91 @@
         }
 
         function executeAdminLogout() { sessionStorage.removeItem(STORAGE_AUTH_KEY); window.location.reload(); }
+
+        // ── TAB NAVIGATION ────────────────────────────────────────────
+        function showTab(tab) {
+            const voucher = document.getElementById('admin-dashboard');
+            const broadcast = document.getElementById('broadcast-section');
+            const tabVoucher = document.getElementById('tab-voucher');
+            const tabBroadcast = document.getElementById('tab-broadcast');
+
+            if (tab === 'voucher') {
+                voucher.classList.remove('hidden');
+                broadcast.classList.add('hidden');
+                tabVoucher.classList.add('bg-white', 'shadow-sm', 'text-gray-800');
+                tabVoucher.classList.remove('text-gray-400');
+                tabBroadcast.classList.remove('bg-white', 'shadow-sm', 'text-gray-800');
+                tabBroadcast.classList.add('text-gray-400');
+            } else {
+                voucher.classList.add('hidden');
+                broadcast.classList.remove('hidden');
+                tabBroadcast.classList.add('bg-white', 'shadow-sm', 'text-gray-800');
+                tabBroadcast.classList.remove('text-gray-400');
+                tabVoucher.classList.remove('bg-white', 'shadow-sm', 'text-gray-800');
+                tabVoucher.classList.add('text-gray-400');
+            }
+        }
+
+        // ── LIVE PREVIEW ──────────────────────────────────────────────
+        document.addEventListener('DOMContentLoaded', () => {
+            const titleEl = document.getElementById('broadcast-title');
+            const bodyEl  = document.getElementById('broadcast-body');
+            if (titleEl) {
+                titleEl.addEventListener('input', () => {
+                    document.getElementById('preview-title').textContent = titleEl.value || 'Apple Air WiFi 🎉';
+                });
+            }
+            if (bodyEl) {
+                bodyEl.addEventListener('input', () => {
+                    document.getElementById('preview-body').textContent = bodyEl.value || 'Your message will appear here...';
+                });
+            }
+        });
+
+        // ── SEND BROADCAST ────────────────────────────────────────────
+        async function sendBroadcast() {
+            const title = document.getElementById('broadcast-title').value.trim();
+            const body  = document.getElementById('broadcast-body').value.trim();
+            const btn   = document.getElementById('broadcast-btn');
+            const result = document.getElementById('broadcast-result');
+
+            if (!title || !body) {
+                alert('Please enter both a title and a message.');
+                return;
+            }
+
+            const confirmed = confirm(`Send this notification to ALL customers?\n\n📌 ${title}\n💬 ${body}`);
+            if (!confirmed) return;
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Sending...';
+            result.classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/broadcast', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, body })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    result.textContent = `✅ Sent to ${data.sent} customers! ${data.failed > 0 ? `(${data.failed} failed)` : ''}`;
+                    result.className = 'text-center text-xs font-medium py-2 rounded-xl bg-green-50 text-green-700';
+                } else {
+                    result.textContent = `❌ Error: ${data.error}`;
+                    result.className = 'text-center text-xs font-medium py-2 rounded-xl bg-red-50 text-red-600';
+                }
+                result.classList.remove('hidden');
+            } catch (e) {
+                result.textContent = '❌ Network error. Please try again.';
+                result.className = 'text-center text-xs font-medium py-2 rounded-xl bg-red-50 text-red-600';
+                result.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🚀 Send to All Customers';
+            }
+        }
     </script>
 </body>
 </html>
