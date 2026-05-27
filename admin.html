@@ -25,8 +25,8 @@
         <button id="btn-logout" onclick="executeAdminLogout()" class="text-xs font-medium text-red-500 hover:text-red-600 hidden">Sign Out</button>
     </header>
 
-    <main class="w-full max-w-4xl mx-auto px-6 flex-grow flex flex-col justify-center py-12">
-        <div id="admin-auth-gate" class="w-full max-w-md mx-auto bg-white/80 border border-white backdrop-blur-xl rounded-3xl p-8 shadow-glass space-y-6">
+    <main class="w-full max-w-4xl mx-auto px-6 flex-grow flex flex-col py-12 gap-6">
+        <div id="admin-auth-gate" class="w-full max-w-md mx-auto self-center bg-white/80 border border-white backdrop-blur-xl rounded-3xl p-8 shadow-glass space-y-6">
             <h1 class="text-xl font-semibold tracking-tight text-center">Staff Authentication</h1>
             <div class="space-y-4">
                 <input type="text" id="admin-user" placeholder="Username" class="w-full px-4 py-3 bg-white/50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500">
@@ -49,7 +49,7 @@
             </div>
         </div>
 
-        <div id="admin-dashboard" class="w-full space-y-8 hidden opacity-0 transform translate-y-4 transition-all duration-300">
+        <div id="admin-dashboard" class="w-full space-y-8 hidden">
             <div>
                 <h1 class="text-2xl font-semibold tracking-tight">Voucher Provisioning</h1>
                 <p class="text-xs text-[#86868B] mt-1">Configure your live Google Sheet database globally across all devices.</p>
@@ -78,6 +78,8 @@
                     </div>
                 </div>
             </div>
+        </div><!-- end admin-dashboard -->
+
         <!-- ── BROADCAST NOTIFICATION SECTION ── -->
         <div id="broadcast-section" class="w-full hidden">
             <div class="mb-6">
@@ -118,7 +120,6 @@
             </div>
         </div>
 
-        </div>
     </main>
 
     <script>
@@ -145,7 +146,6 @@
             document.getElementById('admin-tabs').classList.remove('hidden');
             const d = document.getElementById('admin-dashboard');
             d.classList.remove('hidden');
-            setTimeout(() => { d.classList.remove('opacity-0', 'translate-y-4'); }, 50);
             
             // Pull the saved link from the cloud database so it shows up on your Windows PC or iPhone instantly
             try {
