@@ -163,6 +163,28 @@ function setupNotification(expiryDateString, voucherCode) {
             // Save settings locally to device storage
             localStorage.setItem(storageKeyDate, alertString);
             localStorage.setItem(storageKeyStatus, 'pending');
+
+            // ── Save FCM token to Subscribers sheet for broadcast ──
+            try {
+                if (typeof firebase !== 'undefined' && window.fcmMessaging) {
+                    const VAPID_KEY = "BGeRhehk4k_iL9OfCIlKLEzT7RDxYcmkE-Pe1f8xXrAUE95Zhljn1WUsbq3y48lEB3K47yOzizNhXsTZK6oOrDo";
+                    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxRx3bHJiY_AmBBQWuTSBnEtiFi8K1rPUZp18LKpQbg1Xi3q_xYWNSrvrcFHUkeic85/exec';
+                    const fcmToken = await window.fcmMessaging.getToken({ vapidKey: VAPID_KEY });
+                    if (fcmToken) {
+                        await fetch(APPS_SCRIPT_URL, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                type: 'subscriber',
+                                fcmToken: fcmToken,
+                                subscribedAt: new Date().toLocaleDateString('en-GB')
+                            })
+                        });
+                        console.log('✅ Subscriber token saved to Subscribers sheet');
+                    }
+                }
+            } catch(e) { console.log('Subscriber save (non-critical):', e.message); }
             
             // Visual dynamic structural transformation
             notifyBtn.innerHTML = '<span>Reminder Scheduled!</span> <span>✅</span>';
