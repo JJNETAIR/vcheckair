@@ -1,133 +1,276 @@
-const STORAGE_AUTH_KEY = 'apple_air_admin_auth';
-const DB_VOUCHERS_KEY = 'apple_air_voucher_database';
-
-document.addEventListener('DOMContentLoaded', () => {
-    if (sessionStorage.getItem(STORAGE_AUTH_KEY) === 'true') displayAdminPanel();
-});
-
-function processAdminAuthentication() {
-    const user = document.getElementById('admin-user').value;
-    const pass = document.getElementById('admin-pass').value;
-    if (user === 'admin' && pass === 'appleair2026') {
-        sessionStorage.setItem(STORAGE_AUTH_KEY, 'true');
-        displayAdminPanel();
-    } else {
-        displayToast('Invalid security verification credentials.');
-    }
-}
-
-function displayAdminPanel() {
-    document.getElementById('admin-auth-gate').classList.add('hidden');
-    if(document.getElementById('btn-logout')) document.getElementById('btn-logout').classList.remove('hidden');
-    const dashboard = document.getElementById('admin-dashboard');
-    dashboard.classList.remove('hidden');
-    setTimeout(() => dashboard.classList.remove('opacity-0', 'translate-y-4'), 50);
-    // Default sheet URL — always shows even after browser reset
-    const DEFAULT_SHEET = 'https://docs.google.com/spreadsheets/d/1F8TUOpY9vudo9MsTWOwHwLlBKi1P6_ayikucdTjyrbg/edit';
-    const savedSheet = localStorage.getItem('apple_air_configured_sheet') || DEFAULT_SHEET;
-    if (document.getElementById('sheet-url-input')) {
-        document.getElementById('sheet-url-input').value = savedSheet;
-    }
-}
-
-async function triggerGoogleSheetSync() {
-    const urlInput = document.getElementById('sheet-url-input').value.trim();
-    if (!urlInput) return displayToast('Please enter a Google Sheet URL.');
-    const matches = urlInput.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if (!matches) return displayToast('Invalid Spreadsheet URL format.');
-
-    const csvEndpoint = `https://docs.google.com/spreadsheets/d/${matches[1]}/export?format=csv`;
-    try {
-        displayToast('Connecting to directory sheet...');
-        const res = await fetch(csvEndpoint);
-        if (!res.ok) throw new Error('Data fetch failed.');
-        const csvText = await res.text();
-        const parsed = parseCsvDataStructure(csvText);
-
-        if (parsed.length === 0) return displayToast('Sync mapping failed: Empty rows.');
-        localStorage.setItem(DB_VOUCHERS_KEY, JSON.stringify(parsed));
-        localStorage.setItem('apple_air_configured_sheet', urlInput);
-        displayToast(`✅ Successfully synced ${parsed.length} vouchers!`);
-    } catch (e) {
-        console.log('Sync error:', e);
-        alert('Failed to push sync to cloud server.
-
-Make sure your Google Sheet is shared publicly:
-Share → Anyone with link → Viewer');
-    }
-}
-
-function parseCsvDataStructure(csvText) {
-    // Proper CSV parser handles multiline quoted fields from Google Sheets
-    const records = [];
-    let row = [], field = '', inQ = false;
-    for (let i = 0; i < csvText.length; i++) {
-        const ch = csvText[i], nx = csvText[i+1];
-        if (inQ) {
-            if (ch==='"' && nx==='"') { field+='"'; i++; }
-            else if (ch==='"') { inQ=false; }
-            else field+=ch;
-        } else {
-            if (ch==='"') { inQ=true; }
-            else if (ch===',') { row.push(field.trim()); field=''; }
-            else if (ch==='
-'||(ch==='
-'&&nx==='
-')) {
-                row.push(field.trim());
-                if (row.some(c=>c!=='')) records.push(row);
-                row=[]; field='';
-                if(ch==='
-') i++;
-            } else field+=ch;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apple Air - Admin Console</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', 'sans-serif'] },
+                    boxShadow: { 'apple': '0 4px 30px rgba(0, 0, 0, 0.02)', 'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.04)' }
+                }
+            }
         }
-    }
-    if (field||row.length){ row.push(field.trim()); if(row.some(c=>c!=='')) records.push(row); }
-    if (records.length < 2) return [];
+    </script>
+</head>
+<body class="bg-[#F5F5F7] text-[#1D1D1F] min-h-screen flex flex-col justify-between">
+    <header class="w-full py-6 px-8 flex justify-between items-center border-b border-gray-200/50 bg-white/40 backdrop-blur-md sticky top-0 z-40">
+        <div class="flex items-center space-x-2">
+            <div class="w-7 h-7 rounded-lg bg-white border border-gray-200 flex items-center justify-center"><span class="text-xs font-semibold opacity-70"></span></div>
+            <span class="text-xs font-semibold tracking-wider uppercase text-[#86868B]">Air Console</span>
+        </div>
+        <button id="btn-logout" onclick="executeAdminLogout()" class="text-xs font-medium text-red-500 hover:text-red-600 hidden">Sign Out</button>
+    </header>
 
-    // Sheet layout: A=user, B=code, C=starttime, D=status, E=Expirationtime
-    const result = [];
-    for (let i = 1; i < records.length; i++) {
-        const cols = records[i];
-        const code = (cols[1]||'').replace(/Voucher\s*-\s*/i,'').trim();
-        if (!code) continue;
-        const clean = s => (s||'').replace(/[
-]+/g,' ').replace(/"+/g,'').trim();
-        result.push({
-            user:       clean(cols[0]),
-            code:       code.toUpperCase(),
-            startTime:  clean(cols[2]),
-            status:     clean(cols[3]),
-            expiryText: clean(cols[4])
+    <main class="w-full max-w-4xl mx-auto px-6 flex-grow flex flex-col justify-center py-12">
+        <div id="admin-auth-gate" class="w-full max-w-md mx-auto bg-white/80 border border-white backdrop-blur-xl rounded-3xl p-8 shadow-glass space-y-6">
+            <h1 class="text-xl font-semibold tracking-tight text-center">Staff Authentication</h1>
+            <div class="space-y-4">
+                <input type="text" id="admin-user" placeholder="Username" class="w-full px-4 py-3 bg-white/50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500">
+                <input type="password" id="admin-pass" placeholder="Password" class="w-full px-4 py-3 bg-white/50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500">
+                <button onclick="handleEmbeddedLogin()" class="w-full py-3 bg-[#1D1D1F] text-white text-sm font-medium rounded-xl hover:bg-black shadow-sm">Sign In</button>
+            </div>
+        </div>
+
+        <!-- Tab Buttons (shown after login) -->
+        <div id="admin-tabs" class="hidden w-full mb-2">
+            <div class="flex bg-gray-100 rounded-2xl p-1 gap-1 max-w-xs">
+                <button id="tab-voucher" onclick="showTab('voucher')"
+                    class="flex-1 py-2 text-xs font-medium rounded-xl bg-white shadow-sm text-gray-800 transition-all">
+                    📋 Vouchers
+                </button>
+                <button id="tab-broadcast" onclick="showTab('broadcast')"
+                    class="flex-1 py-2 text-xs font-medium rounded-xl text-gray-400 transition-all">
+                    📣 Broadcast
+                </button>
+            </div>
+        </div>
+
+        <div id="admin-dashboard" class="w-full space-y-8 hidden opacity-0 transform translate-y-4 transition-all duration-300">
+            <div>
+                <h1 class="text-2xl font-semibold tracking-tight">Voucher Provisioning</h1>
+                <p class="text-xs text-[#86868B] mt-1">Configure your live Google Sheet database globally across all devices.</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-white border border-gray-200/60 rounded-3xl p-6 shadow-apple space-y-4">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">📊</div>
+                    <h3 class="text-base font-semibold">Google Sheets Automator</h3>
+                    <p class="text-xs text-[#86868B] leading-relaxed">Paste your link. It updates instantly worldwide.</p>
+                    
+                    <input type="text" id="sheet-url-input" placeholder="Loading active cloud configuration..." class="w-full px-4 py-3 bg-[#F5F5F7] border border-transparent rounded-xl text-xs focus:outline-none focus:border-blue-500 focus:bg-white">
+                    
+                    <button onclick="saveLinkToCloud()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-xl shadow-sm">
+                        Synchronize Worldwide Directory
+                    </button>
+                    <p id="sync-status" class="text-[11px] text-gray-400 text-center italic"></p>
+                </div>
+
+                <div class="bg-white border border-gray-200/60 rounded-3xl p-6 shadow-apple space-y-4">
+                    <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg">🌐</div>
+                    <h3 class="text-base font-semibold">Global Status Monitor</h3>
+                    <p class="text-xs text-[#86868B]">Connected to live cloud network. Changes apply to all users instantly.</p>
+                    <div class="pt-2 text-xs text-emerald-600 font-mono flex items-center">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-2"></span> Cloud Database Storage: Active
+                    </div>
+                </div>
+            </div>
+        </div><!-- end admin-dashboard -->
+
+        <!-- ── BROADCAST NOTIFICATION SECTION ── -->
+        <div id="broadcast-section" class="w-full hidden">
+            <div class="mb-6">
+                <h1 class="text-2xl font-semibold tracking-tight">📣 Broadcast Notification</h1>
+                <p class="text-xs text-[#86868B] mt-1">Send a custom push notification to all subscribed customers instantly.</p>
+            </div>
+
+            <div class="bg-white border border-gray-200/60 rounded-3xl p-6 shadow-apple space-y-4 max-w-lg">
+                <div class="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center text-lg">🔔</div>
+                <h3 class="text-base font-semibold">Send to All Customers</h3>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-xs font-medium text-gray-600 mb-1 block">Notification Title</label>
+                        <input type="text" id="broadcast-title" placeholder="e.g. Apple Air WiFi 🎉"
+                            class="w-full px-4 py-3 bg-[#F5F5F7] border border-transparent rounded-xl text-xs focus:outline-none focus:border-orange-400 focus:bg-white" />
+                    </div>
+                    <div>
+                        <label class="text-xs font-medium text-gray-600 mb-1 block">Message</label>
+                        <textarea id="broadcast-body" rows="3" placeholder="e.g. Eid Mubarak! 🌙 Wishing you and your family a blessed celebration."
+                            class="w-full px-4 py-3 bg-[#F5F5F7] border border-transparent rounded-xl text-xs focus:outline-none focus:border-orange-400 focus:bg-white resize-none"></textarea>
+                    </div>
+                </div>
+
+                <!-- Preview -->
+                <div class="bg-gray-50 border border-gray-100 rounded-2xl p-4 space-y-1">
+                    <p class="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">Preview</p>
+                    <p id="preview-title" class="text-xs font-semibold text-gray-800">Apple Air WiFi 🎉</p>
+                    <p id="preview-body" class="text-xs text-gray-500">Your message will appear here...</p>
+                </div>
+
+                <button onclick="sendBroadcast()" id="broadcast-btn"
+                    class="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors">
+                    🚀 Send to All Customers
+                </button>
+
+                <div id="broadcast-result" class="hidden text-center text-xs font-medium py-2 rounded-xl"></div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // REPLACE THESE WITH YOUR JSONBIN DETAILS
+        const BIN_ID = "6a0cacb36877513b279bbe63"; 
+        const MASTER_KEY = "$2a$10$LS7aJr2QiV2RpptiyeBA9umWLUV9NV8nYaEVHT91YLShcgX1xNPbC"; 
+
+        const STORAGE_AUTH_KEY = 'apple_air_admin_auth';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (sessionStorage.getItem(STORAGE_AUTH_KEY) === 'true') { displayAdminPanel(); }
         });
-    }
-    return result;
-}
 
-function processManualProvisioning() {
-    const code = document.getElementById('man-code').value.trim().toUpperCase();
-    const speed = document.getElementById('man-speed').value;
-    const data = document.getElementById('man-data').value;
-    const time = document.getElementById('man-time').value;
+        function handleEmbeddedLogin() {
+            if (document.getElementById('admin-user').value.trim() === 'admin' && document.getElementById('admin-pass').value.trim() === 'appleair2026') {
+                sessionStorage.setItem(STORAGE_AUTH_KEY, 'true');
+                displayAdminPanel();
+            } else { alert('Invalid security credentials.'); }
+        }
 
-    if (!code || !data || !time) return displayToast('Complete all fields.');
-    const newVoucher = { code, timeRemaining: `${time} Hours`, dataAllowance: `${data} GB / ${data} GB`, speedTier: speed };
-    const db = JSON.parse(localStorage.getItem(DB_VOUCHERS_KEY)) || [];
-    const updated = db.filter(v => v.code !== code);
-    updated.push(newVoucher);
-    localStorage.setItem(DB_VOUCHERS_KEY, JSON.stringify(updated));
-    displayToast(`Voucher ${code} provisioned manually.`);
-    document.getElementById('man-code').value = '';
-    document.getElementById('man-data').value = '';
-    document.getElementById('man-time').value = '';
-}
+        async function displayAdminPanel() {
+            document.getElementById('admin-auth-gate').classList.add('hidden');
+            document.getElementById('btn-logout').classList.remove('hidden');
+            document.getElementById('admin-tabs').classList.remove('hidden');
+            const d = document.getElementById('admin-dashboard');
+            d.classList.remove('hidden');
+            setTimeout(() => { d.classList.remove('opacity-0', 'translate-y-4'); }, 50);
+            
+            // Pull the saved link from the cloud database so it shows up on your Windows PC or iPhone instantly
+            try {
+                const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    headers: { "X-Master-Key": MASTER_KEY }
+                });
+                const data = await res.json();
+                if (data.record.url) { document.getElementById('sheet-url-input').value = data.record.url; }
+            } catch (e) { console.log("Cloud read error:", e); }
+        }
 
-function executeAdminLogout() { sessionStorage.removeItem(STORAGE_AUTH_KEY); window.location.reload(); }
-function displayToast(m) {
-    const old = document.getElementById('admin-toast'); if (old) old.remove();
-    const el = document.createElement('div'); el.id = 'admin-toast';
-    el.className = "fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-4 py-2.5 rounded-full shadow-lg z-50 transition-all duration-200 opacity-0 translate-y-1 pointer-events-none";
-    el.innerText = m; document.body.appendChild(el);
-    setTimeout(() => el.classList.remove('opacity-0', 'translate-y-1'), 30);
-    setTimeout(() => { el.classList.add('opacity-0', 'translate-y-1'); setTimeout(() => el.remove(), 200); }, 3000);
-}
+        async function saveLinkToCloud() {
+            const urlInput = document.getElementById('sheet-url-input').value.trim();
+            if (!urlInput || !urlInput.includes('/d/')) return alert('Please enter a valid Google Sheet URL.');
+
+            const statusText = document.getElementById('sync-status');
+            statusText.innerText = "Saving to global cloud database...";
+
+            try {
+                const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                    method: 'PUT',
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Master-Key": MASTER_KEY
+                    },
+                    body: JSON.stringify({ url: urlInput })
+                });
+
+                if (res.ok) {
+                    statusText.innerText = "✓ Synced successfully! Active globally on all devices.";
+                    statusText.className = "text-[11px] text-emerald-600 font-medium text-center";
+                } else { throw new Error(); }
+            } catch (e) {
+                alert("Failed to push sync to cloud server.");
+                statusText.innerText = "";
+            }
+        }
+
+        function executeAdminLogout() { sessionStorage.removeItem(STORAGE_AUTH_KEY); window.location.reload(); }
+
+        // ── TAB NAVIGATION ────────────────────────────────────────────
+        function showTab(tab) {
+            const voucher = document.getElementById('admin-dashboard');
+            const broadcast = document.getElementById('broadcast-section');
+            const tabVoucher = document.getElementById('tab-voucher');
+            const tabBroadcast = document.getElementById('tab-broadcast');
+
+            if (tab === 'voucher') {
+                voucher.classList.remove('hidden');
+                broadcast.classList.add('hidden');
+                tabVoucher.classList.add('bg-white', 'shadow-sm', 'text-gray-800');
+                tabVoucher.classList.remove('text-gray-400');
+                tabBroadcast.classList.remove('bg-white', 'shadow-sm', 'text-gray-800');
+                tabBroadcast.classList.add('text-gray-400');
+            } else {
+                voucher.classList.add('hidden');
+                broadcast.classList.remove('hidden');
+                tabBroadcast.classList.add('bg-white', 'shadow-sm', 'text-gray-800');
+                tabBroadcast.classList.remove('text-gray-400');
+                tabVoucher.classList.remove('bg-white', 'shadow-sm', 'text-gray-800');
+                tabVoucher.classList.add('text-gray-400');
+            }
+        }
+
+        // ── LIVE PREVIEW ──────────────────────────────────────────────
+        document.addEventListener('DOMContentLoaded', () => {
+            const titleEl = document.getElementById('broadcast-title');
+            const bodyEl  = document.getElementById('broadcast-body');
+            if (titleEl) {
+                titleEl.addEventListener('input', () => {
+                    document.getElementById('preview-title').textContent = titleEl.value || 'Apple Air WiFi 🎉';
+                });
+            }
+            if (bodyEl) {
+                bodyEl.addEventListener('input', () => {
+                    document.getElementById('preview-body').textContent = bodyEl.value || 'Your message will appear here...';
+                });
+            }
+        });
+
+        // ── SEND BROADCAST ────────────────────────────────────────────
+        async function sendBroadcast() {
+            const title = document.getElementById('broadcast-title').value.trim();
+            const body  = document.getElementById('broadcast-body').value.trim();
+            const btn   = document.getElementById('broadcast-btn');
+            const result = document.getElementById('broadcast-result');
+
+            if (!title || !body) {
+                alert('Please enter both a title and a message.');
+                return;
+            }
+
+            const confirmed = confirm(`Send this notification to ALL customers?\n\n📌 ${title}\n💬 ${body}`);
+            if (!confirmed) return;
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Sending...';
+            result.classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/broadcast', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, body })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    result.textContent = `✅ Sent to ${data.sent} customers! ${data.failed > 0 ? `(${data.failed} failed)` : ''}`;
+                    result.className = 'text-center text-xs font-medium py-2 rounded-xl bg-green-50 text-green-700';
+                } else {
+                    result.textContent = `❌ Error: ${data.error}`;
+                    result.className = 'text-center text-xs font-medium py-2 rounded-xl bg-red-50 text-red-600';
+                }
+                result.classList.remove('hidden');
+            } catch (e) {
+                result.textContent = '❌ Network error. Please try again.';
+                result.className = 'text-center text-xs font-medium py-2 rounded-xl bg-red-50 text-red-600';
+                result.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🚀 Send to All Customers';
+            }
+        }
+    </script>
+</body>
+</html>
