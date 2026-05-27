@@ -25,11 +25,11 @@ export default async function handler(req, res) {
         // Step 1: Get OAuth2 access token
         const accessToken = await getAccessToken();
 
-        // Step 2: Fetch all FCM tokens from Google Sheets
-        const tokensUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Tokens&t=${Date.now()}`;
+        // Step 2: Fetch all FCM tokens from Subscribers sheet
+        const tokensUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Subscribers&t=${Date.now()}`;
         const tokensResponse = await fetch(tokensUrl);
         if (!tokensResponse.ok) {
-            return res.status(200).json({ success: true, message: 'No Tokens sheet found', sent: 0 });
+            return res.status(200).json({ success: true, message: 'No Subscribers sheet found', sent: 0 });
         }
 
         const tokensCsv = await tokensResponse.text();
@@ -44,20 +44,19 @@ export default async function handler(req, res) {
         const seenTokens = new Set();
 
         for (const row of tokenRows.slice(1)) {
-            const voucherCode = (row[0] || '').replace(/"/g, '').trim();
-            const fcmToken   = (row[1] || '').replace(/"/g, '').trim();
+            const fcmToken = (row[0] || '').replace(/"/g, '').trim(); // col 0 = FCM token
 
             if (!fcmToken) { skipped++; continue; }
-            if (seenTokens.has(fcmToken)) { skipped++; continue; } // avoid duplicates
+            if (seenTokens.has(fcmToken)) { skipped++; continue; }
             seenTokens.add(fcmToken);
 
             try {
                 await sendFCMv1(accessToken, fcmToken, title, body);
                 sent++;
-                console.log(`✅ Sent to ${voucherCode || fcmToken.slice(0, 10)}`);
+                console.log(`✅ Sent to ${fcmToken.slice(0, 10)}`);
             } catch (e) {
                 failed++;
-                console.log(`❌ Failed for ${voucherCode}:`, e.message);
+                console.log(`❌ Failed:`, e.message);
             }
         }
 
