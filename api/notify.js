@@ -1,168 +1,196 @@
 /**
- * Apple Air - Daily Notification API
- * Vercel Cron: runs every day at 8:00 AM
- * 1. Reads Google Sheet for FCM tokens + expiry dates
- * 2. Finds vouchers expiring tomorrow
- * 3. Sends FCM push notification to each customer
+ * Apple Air - Daily Notification API (FCM v1)
+ * Vercel Cron: runs every day at 5:00 AM UTC (8:00 AM Jeddah)
  */
 
 const SHEET_ID = '1F8TUOpY9vudo9MsTWOwHwLlBKi1P6_ayikucdTjyrbg';
-const FCM_SERVER_KEY = process.env.FCM_SERVER_KEY; // set in Vercel env vars
+const PROJECT_ID = 'apple-air';
 
 export default async function handler(req, res) {
-    // Security: only allow Vercel cron or manual trigger with secret
-    const authHeader = req.headers.authorization;
-    const cronSecret = process.env.CRON_SECRET || 'apple-air-cron';
-    
-    if (req.method !== 'GET' && req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
-
     try {
-        console.log('🔔 Apple Air Notification Cron Started:', new Date().toISOString());
+        console.log('Apple Air Cron Started:', new Date().toISOString());
 
-        // Step 1: Fetch Google Sheet CSV
-        const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&t=${Date.now()}`;
-        const csvResponse = await fetch(csvUrl);
-        if (!csvResponse.ok) throw new Error(`Sheet fetch failed: ${csvResponse.status}`);
-        const csvText = await csvResponse.text();
+        // Step 1: Get OAuth2 access token using service account
+        const accessToken = await getAccessToken();
 
-        // Step 2: Parse CSV - get Tokens tab
-        // Main sheet columns: A=user, B=code, C=starttime, D=status, E=expiry
-        const rows = parseCSV(csvText);
-        
+        // Step 2: Fetch Tokens sheet from Google Sheets
+        const tokensUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Tokens&t=${Date.now()}`;
+        const tokensResponse = await fetch(tokensUrl);
+        if (!tokensResponse.ok) {
+            return res.status(200).json({ success: true, message: 'No Tokens sheet yet', sent: 0 });
+        }
+        const tokensCsv = await tokensResponse.text();
+        const tokenRows = parseCSV(tokensCsv);
+
+        if (tokenRows.length < 2) {
+            return res.status(200).json({ success: true, message: 'No subscribers yet', sent: 0 });
+        }
+
         // Step 3: Find tomorrow's date
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         const tomorrowStr = tomorrow.toLocaleDateString('en-GB'); // DD/MM/YYYY
 
-        // Step 4: Fetch Tokens sheet
-        const tokensUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=tokens&t=${Date.now()}`;
-        let tokenRows = [];
-        try {
-            const tokensResponse = await fetch(
-                `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Tokens`
-            );
-            if (tokensResponse.ok) {
-                const tokenCsv = await tokensResponse.text();
-                tokenRows = parseCSV(tokenCsv);
-            }
-        } catch(e) {
-            console.log('Tokens sheet not found:', e.message);
-        }
+        console.log('Looking for expiry date:', tomorrowStr);
 
-        // Step 5: Match expiring vouchers with tokens
-        const notifications = [];
-        
-        for (const tokenRow of tokenRows.slice(1)) { // skip header
-            const voucherCode = (tokenRow[0] || '').trim().toUpperCase();
-            const fcmToken = (tokenRow[1] || '').trim();
-            const expiryDate = (tokenRow[2] || '').trim();
-            
+        // Step 4: Send notifications to matching vouchers
+        let sent = 0, failed = 0;
+        for (const row of tokenRows.slice(1)) {
+            const voucherCode = (row[0] || '').replace(/"/g,'').trim();
+            const fcmToken   = (row[1] || '').replace(/"/g,'').trim();
+            const expiryDate = (row[2] || '').replace(/"/g,'').trim();
+
             if (!fcmToken || !expiryDate) continue;
-            
-            // Check if expiry is tomorrow
-            const expiryFormatted = formatDateToGB(expiryDate);
-            if (expiryFormatted === tomorrowStr) {
-                notifications.push({ voucherCode, fcmToken, expiryDate });
-            }
-        }
 
-        console.log(`Found ${notifications.length} vouchers expiring tomorrow`);
+            // Parse expiry and compare with tomorrow
+            const expiryGB = toGB(expiryDate);
+            if (expiryGB !== tomorrowStr) continue;
 
-        // Step 6: Send FCM notifications
-        const results = [];
-        for (const notif of notifications) {
             try {
-                const fcmResult = await sendFCMNotification(
-                    notif.fcmToken,
-                    'Apple Air WiFi 🔔',
-                    `Your voucher ${notif.voucherCode} expires tomorrow! Renew now to stay connected.`,
-                    notif.voucherCode
-                );
-                results.push({ code: notif.voucherCode, success: true });
-                console.log(`✅ Sent to ${notif.voucherCode}`);
+                await sendFCMv1(accessToken, fcmToken, voucherCode);
+                sent++;
+                console.log(`Sent to ${voucherCode}`);
             } catch(e) {
-                results.push({ code: notif.voucherCode, success: false, error: e.message });
-                console.log(`❌ Failed for ${notif.voucherCode}:`, e.message);
+                failed++;
+                console.log(`Failed for ${voucherCode}:`, e.message);
             }
         }
 
-        return res.status(200).json({
-            success: true,
-            date: new Date().toISOString(),
-            tomorrowDate: tomorrowStr,
-            notificationsSent: results.filter(r => r.success).length,
-            notificationsFailed: results.filter(r => !r.success).length,
-            results
-        });
+        return res.status(200).json({ success: true, sent, failed, date: tomorrowStr });
 
     } catch(error) {
-        console.error('Cron error:', error);
+        console.error('Cron error:', error.message);
         return res.status(500).json({ success: false, error: error.message });
     }
 }
 
-// Send FCM notification using Firebase HTTP v1 API
-async function sendFCMNotification(token, title, body, voucherCode) {
-    if (!FCM_SERVER_KEY) throw new Error('FCM_SERVER_KEY not configured');
-    
-    const response = await fetch('https://fcm.googleapis.com/fcm/send', {
-        method: 'POST',
-        headers: {
-            'Authorization': `key=${FCM_SERVER_KEY}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            to: token,
-            notification: {
-                title,
-                body,
-                icon: '/icons/icon-192.png',
-                click_action: 'https://vcheckair.vercel.app'
+// ── SEND FCM v1 NOTIFICATION ─────────────────────────────────────────
+async function sendFCMv1(accessToken, token, voucherCode) {
+    const response = await fetch(
+        `https://fcm.googleapis.com/v1/projects/${PROJECT_ID}/messages:send`,
+        {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
             },
-            data: {
-                voucher_code: voucherCode,
-                url: 'https://vcheckair.vercel.app'
-            }
-        })
-    });
-
+            body: JSON.stringify({
+                message: {
+                    token: token,
+                    notification: {
+                        title: 'Apple Air WiFi 🔔',
+                        body: `Your voucher ${voucherCode} expires tomorrow! Renew now to stay connected.`
+                    },
+                    webpush: {
+                        notification: {
+                            icon: 'https://vcheckair.vercel.app/icons/icon-192.png',
+                            click_action: 'https://vcheckair.vercel.app'
+                        }
+                    },
+                    data: {
+                        voucher_code: voucherCode,
+                        url: 'https://vcheckair.vercel.app'
+                    }
+                }
+            })
+        }
+    );
     const result = await response.json();
-    if (result.failure > 0) throw new Error(`FCM failed: ${JSON.stringify(result)}`);
+    if (!response.ok) throw new Error(JSON.stringify(result));
     return result;
 }
 
-// Simple CSV parser
+// ── GET OAUTH2 ACCESS TOKEN FROM SERVICE ACCOUNT ─────────────────────
+async function getAccessToken() {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    
+    const now = Math.floor(Date.now() / 1000);
+    const header = { alg: 'RS256', typ: 'JWT' };
+    const payload = {
+        iss: serviceAccount.client_email,
+        scope: 'https://www.googleapis.com/auth/firebase.messaging',
+        aud: 'https://oauth2.googleapis.com/token',
+        iat: now,
+        exp: now + 3600
+    };
+
+    const jwt = await createJWT(header, payload, serviceAccount.private_key);
+
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
+    });
+
+    const tokenData = await tokenResponse.json();
+    if (!tokenData.access_token) throw new Error('Failed to get access token: ' + JSON.stringify(tokenData));
+    return tokenData.access_token;
+}
+
+// ── CREATE JWT FOR SERVICE ACCOUNT ───────────────────────────────────
+async function createJWT(header, payload, privateKeyPem) {
+    const encode = obj => btoa(JSON.stringify(obj))
+        .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+
+    const signingInput = `${encode(header)}.${encode(payload)}`;
+
+    // Import private key
+    const pemContents = privateKeyPem
+        .replace('-----BEGIN PRIVATE KEY-----', '')
+        .replace('-----END PRIVATE KEY-----', '')
+        .replace(/\s/g, '');
+    
+    const binaryKey = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
+    
+    const cryptoKey = await crypto.subtle.importKey(
+        'pkcs8', binaryKey.buffer,
+        { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+        false, ['sign']
+    );
+
+    const signature = await crypto.subtle.sign(
+        'RSASSA-PKCS1-v1_5',
+        cryptoKey,
+        new TextEncoder().encode(signingInput)
+    );
+
+    const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
+        .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+
+    return `${signingInput}.${sigB64}`;
+}
+
+// ── CSV PARSER ────────────────────────────────────────────────────────
 function parseCSV(text) {
     const records = [];
     let row = [], field = '', inQ = false;
     for (let i = 0; i < text.length; i++) {
         const ch = text[i], nx = text[i+1];
         if (inQ) {
-            if (ch==='"' && nx==='"') { field+='"'; i++; }
-            else if (ch==='"') { inQ=false; }
+            if (ch==='"'&&nx==='"'){field+='"';i++;}
+            else if(ch==='"'){inQ=false;}
             else field+=ch;
         } else {
-            if (ch==='"') { inQ=true; }
-            else if (ch===',') { row.push(field.trim()); field=''; }
-            else if (ch==='\n'||(ch==='\r'&&nx==='\n')) {
+            if(ch==='"'){inQ=true;}
+            else if(ch===','){row.push(field.trim());field='';}
+            else if(ch==='\n'||(ch==='\r'&&nx==='\n')){
                 row.push(field.trim());
-                if (row.some(c=>c!=='')) records.push(row);
-                row=[]; field='';
-                if(ch==='\r') i++;
+                if(row.some(c=>c!==''))records.push(row);
+                row=[];field='';
+                if(ch==='\r')i++;
             } else field+=ch;
         }
     }
-    if (field||row.length){ row.push(field.trim()); if(row.some(c=>c!=='')) records.push(row); }
+    if(field||row.length){row.push(field.trim());if(row.some(c=>c!==''))records.push(row);}
     return records;
 }
 
-// Format any date string to DD/MM/YYYY for comparison
-function formatDateToGB(dateStr) {
+// ── DATE FORMATTER ────────────────────────────────────────────────────
+function toGB(dateStr) {
     try {
         const d = new Date(dateStr);
         if (!isNaN(d.getTime())) return d.toLocaleDateString('en-GB');
     } catch(e) {}
-    return dateStr;
+    // Already DD/MM/YYYY format
+    return dateStr.split(' ')[0];
 }
