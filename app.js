@@ -225,3 +225,4 @@ function displaySystemToast(message) {
         setTimeout(() => toast.remove(), 300);
     }, 3500);
 }
+
