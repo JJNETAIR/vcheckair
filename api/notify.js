@@ -187,10 +187,34 @@ function parseCSV(text) {
 
 // ── DATE FORMATTER ────────────────────────────────────────────────────
 function toGB(dateStr) {
+    if (!dateStr) return '';
+    const s = dateStr.trim();
+
+    // Already DD/MM/YYYY
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+
+    // Handle "May 28, 2026" or "May 28, 2026 16:04:42"
     try {
-        const d = new Date(dateStr);
-        if (!isNaN(d.getTime())) return d.toLocaleDateString('en-GB');
+        const d = new Date(s);
+        if (!isNaN(d.getTime())) {
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            return `${dd}/${mm}/${yyyy}`;
+        }
     } catch(e) {}
-    // Already DD/MM/YYYY format
-    return dateStr.split(' ')[0];
+
+    // Fallback: strip time part and try again
+    const datePart = s.split(' ')[0];
+    try {
+        const d = new Date(datePart);
+        if (!isNaN(d.getTime())) {
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            return `${dd}/${mm}/${yyyy}`;
+        }
+    } catch(e) {}
+
+    return s;
 }
