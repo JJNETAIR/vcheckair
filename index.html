@@ -1234,6 +1234,13 @@
                     if (window.fcmMessaging) {
                         const fcmToken = await window.fcmMessaging.getToken({ vapidKey: VAPID_KEY });
                         if (fcmToken) {
+                            // Clean expiry date to DD/MM/YYYY only (strip time)
+                            const expiryDateObj = parseSheetDateString(expiryText);
+                            const cleanExpiryDate = expiryDateObj 
+                                ? expiryDateObj.toLocaleDateString('en-GB') 
+                                : expiryText.split(' ')[0];
+
+                            // Save to Tokens sheet for expiry reminders
                             await fetch(APPS_SCRIPT_URL, {
                                 method: 'POST',
                                 mode: 'no-cors',
@@ -1242,10 +1249,23 @@
                                     type: 'token',
                                     voucherCode: voucherCode.toUpperCase(),
                                     fcmToken: fcmToken,
-                                    expiryDate: expiryText
+                                    expiryDate: cleanExpiryDate
                                 })
                             });
-                            console.log('✅ FCM token saved to sheet');
+                            console.log('✅ FCM token saved to Tokens sheet, expiry:', cleanExpiryDate);
+
+                            // Save to Subscribers sheet for broadcast
+                            await fetch(APPS_SCRIPT_URL, {
+                                method: 'POST',
+                                mode: 'no-cors',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    type: 'subscriber',
+                                    fcmToken: fcmToken,
+                                    subscribedAt: new Date().toLocaleDateString('en-GB')
+                                })
+                            });
+                            console.log('✅ FCM token saved to Subscribers sheet');
                         }
                     }
                 } catch(e) { console.log('Token save (non-critical):', e.message); }
