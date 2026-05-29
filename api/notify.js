@@ -88,7 +88,7 @@ async function sendFCMv1(accessToken, token, voucherCode) {
                             badge: 'https://vcheckair.vercel.app/icons/icon-192.png',
                             requireInteraction: true,
                             vibrate: [200, 100, 200],
-                            tag: 'apple-air-expiry',
+                            tag: `apple-air-expiry-${voucherCode}`,
                             renotify: true,
                             click_action: 'https://vcheckair.vercel.app'
                         },
