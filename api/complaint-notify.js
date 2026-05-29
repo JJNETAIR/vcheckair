@@ -28,10 +28,10 @@ export default async function handler(req, res) {
         // Build notification content based on type
         let title, body;
         if (type === 'received') {
-            title = `Apple Air — SR#${srNumber} Received 🔧`;
+            title = `Apple Air — ${srNumber} Received 🔧`;
             body = `Your complaint (${issueType || 'Issue'}) has been received. We're on it!`;
         } else if (type === 'resolved') {
-            title = `Apple Air — SR#${srNumber} Resolved ✅`;
+            title = `Apple Air — ${srNumber} Resolved ✅`;
             body = `Your issue has been resolved! Enjoy your connection. 🚀`;
         } else {
             return res.status(400).json({ success: false, error: 'type must be received or resolved' });
@@ -70,9 +70,18 @@ async function sendFCMv1(accessToken, token, title, body) {
                     token,
                     notification: { title, body },
                     webpush: {
+                        headers: {
+                            'Urgency': 'high'
+                        },
                         notification: {
                             icon: 'https://vcheckair.vercel.app/icons/icon-192.png',
+                            badge: 'https://vcheckair.vercel.app/icons/icon-192.png',
+                            requireInteraction: true,
+                            vibrate: [200, 100, 200],
                             click_action: 'https://vcheckair.vercel.app'
+                        },
+                        fcm_options: {
+                            link: 'https://vcheckair.vercel.app'
                         }
                     },
                     data: { url: 'https://vcheckair.vercel.app' }
