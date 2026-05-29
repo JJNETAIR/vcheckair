@@ -178,6 +178,7 @@ function setupNotification(expiryDateString, voucherCode) {
                             body: JSON.stringify({
                                 type: 'subscriber',
                                 fcmToken: fcmToken,
+                                voucherCode: voucherCode,
                                 subscribedAt: new Date().toLocaleDateString('en-GB')
                             })
                         });
@@ -225,5 +226,3 @@ function displaySystemToast(message) {
         setTimeout(() => toast.remove(), 300);
     }, 3500);
 }
-
-
