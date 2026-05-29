@@ -82,10 +82,17 @@ async function sendFCMv1(accessToken, token, voucherCode) {
                         body: `Your voucher ${voucherCode} expires tomorrow! Renew now to stay connected.`
                     },
                     webpush: {
+                        headers: { 'Urgency': 'high' },
                         notification: {
                             icon: 'https://vcheckair.vercel.app/icons/icon-192.png',
+                            badge: 'https://vcheckair.vercel.app/icons/icon-192.png',
+                            requireInteraction: true,
+                            vibrate: [200, 100, 200],
+                            tag: 'apple-air-expiry',
+                            renotify: true,
                             click_action: 'https://vcheckair.vercel.app'
-                        }
+                        },
+                        fcm_options: { link: 'https://vcheckair.vercel.app' }
                     },
                     data: {
                         voucher_code: voucherCode,
