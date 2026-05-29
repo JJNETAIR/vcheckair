@@ -1396,15 +1396,10 @@
                 // Get FCM token for complaint notifications
                 let fcmToken = '';
                 try {
-                    // Request notification permission if not already granted
-                    if ('Notification' in window && Notification.permission !== 'denied') {
-                        if (Notification.permission !== 'granted') {
-                            await Notification.requestPermission();
-                        }
-                        if (Notification.permission === 'granted' && window.fcmMessaging) {
-                            const VAPID_KEY = "BGeRhehk4k_iL9OfCIlKLEzT7RDxYcmkE-Pe1f8xXrAUE95Zhljn1WUsbq3y48lEB3K47yOzizNhXsTZK6oOrDo";
-                            fcmToken = await window.fcmMessaging.getToken({ vapidKey: VAPID_KEY }) || '';
-                        }
+                    if (window.fcmMessaging) {
+                        const VAPID_KEY = "BGeRhehk4k_iL9OfCIlKLEzT7RDxYcmkE-Pe1f8xXrAUE95Zhljn1WUsbq3y48lEB3K47yOzizNhXsTZK6oOrDo";
+                        fcmToken = await window.fcmMessaging.getToken({ vapidKey: VAPID_KEY }) || '';
+                        console.log('✅ FCM token for complaint:', fcmToken ? 'got it' : 'empty');
                     }
                 } catch(e) { console.log('FCM token fetch (non-critical):', e.message); }
 
