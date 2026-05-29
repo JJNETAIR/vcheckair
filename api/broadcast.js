@@ -83,9 +83,18 @@ async function sendFCMv1(accessToken, token, title, body) {
                     token: token,
                     notification: { title, body },
                     webpush: {
+                        headers: {
+                            'Urgency': 'high'
+                        },
                         notification: {
                             icon: 'https://vcheckair.vercel.app/icons/icon-192.png',
+                            badge: 'https://vcheckair.vercel.app/icons/icon-192.png',
+                            requireInteraction: true,
+                            vibrate: [200, 100, 200],
                             click_action: 'https://vcheckair.vercel.app'
+                        },
+                        fcm_options: {
+                            link: 'https://vcheckair.vercel.app'
                         }
                     },
                     data: { url: 'https://vcheckair.vercel.app' }
