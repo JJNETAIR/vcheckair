@@ -1,7 +1,7 @@
 /**
  * Apple Air - Complaint Notification API (FCM v1)
- * Called by Apps Script to send FCM notifications for complaints
  * POST /api/complaint-notify
+ * Body: { fcmToken, srNumber, type: 'received'|'resolved', issueType }
  */
 
 const PROJECT_ID = 'apple-air';
@@ -13,24 +13,14 @@ export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    // Handle preflight
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-
-    // Allow GET for testing
-    if (req.method === 'GET') {
-        return res.status(200).json({ status: 'Apple Air Complaint Notify API ✅' });
-    }
-
-    if (req.method !== 'POST') {
-        return res.status(405).json({ success: false, error: 'Method not allowed' });
-    }
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    if (req.method === 'GET') return res.status(200).json({ status: 'Apple Air Complaint Notify API ✅' });
+    if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
 
     try {
         const { fcmToken, srNumber, type, issueType } = req.body || {};
 
-        console.log('Complaint notify request:', { srNumber, type, hasToken: !!fcmToken });
+        console.log('Complaint notify:', { srNumber, type, hasToken: !!fcmToken });
 
         if (!fcmToken || !srNumber || !type) {
             return res.status(400).json({ success: false, error: 'fcmToken, srNumber and type are required' });
@@ -48,7 +38,9 @@ export default async function handler(req, res) {
         }
 
         const accessToken = await getAccessToken();
-        await sendFCMv1(accessToken, fcmToken, title, body, type);
+
+        // ✅ Pass srNumber correctly to sendFCMv1
+        await sendFCMv1(accessToken, fcmToken, title, body, srNumber);
 
         console.log(`✅ Sent: ${srNumber} (${type})`);
         return res.status(200).json({ success: true, srNumber, type });
@@ -59,8 +51,10 @@ export default async function handler(req, res) {
     }
 }
 
-async function sendFCMv1(accessToken, token, title, body, type) {
-    const tag = `apple-air-sr-${srNumber}`;
+// ✅ srNumber now properly received as parameter
+async function sendFCMv1(accessToken, token, title, body, srNumber) {
+    const tag = `apple-air-sr-${srNumber}`; // ✅ unique per complaint
+
     const response = await fetch(
         `https://fcm.googleapis.com/v1/projects/${PROJECT_ID}/messages:send`,
         {
@@ -120,10 +114,21 @@ async function getAccessToken() {
 async function createJWT(header, payload, privateKeyPem) {
     const encode = obj => btoa(JSON.stringify(obj)).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
     const signingInput = `${encode(header)}.${encode(payload)}`;
-    const pemContents = privateKeyPem.replace('-----BEGIN PRIVATE KEY-----','').replace('-----END PRIVATE KEY-----','').replace(/\s/g,'');
+    const pemContents = privateKeyPem
+        .replace('-----BEGIN PRIVATE KEY-----','')
+        .replace('-----END PRIVATE KEY-----','')
+        .replace(/\s/g,'');
     const binaryKey = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
-    const cryptoKey = await crypto.subtle.importKey('pkcs8', binaryKey.buffer, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
-    const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, new TextEncoder().encode(signingInput));
-    const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+    const cryptoKey = await crypto.subtle.importKey(
+        'pkcs8', binaryKey.buffer,
+        { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+        false, ['sign']
+    );
+    const signature = await crypto.subtle.sign(
+        'RSASSA-PKCS1-v1_5', cryptoKey,
+        new TextEncoder().encode(signingInput)
+    );
+    const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
+        .replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
     return `${signingInput}.${sigB64}`;
 }
