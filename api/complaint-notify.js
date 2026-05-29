@@ -60,7 +60,7 @@ export default async function handler(req, res) {
 }
 
 async function sendFCMv1(accessToken, token, title, body, type) {
-    const tag = `apple-air-sr-${type}`;
+    const tag = `apple-air-sr-${srNumber}`;
     const response = await fetch(
         `https://fcm.googleapis.com/v1/projects/${PROJECT_ID}/messages:send`,
         {
@@ -81,7 +81,7 @@ async function sendFCMv1(accessToken, token, title, body, type) {
                             requireInteraction: true,
                             vibrate: [200, 100, 200],
                             tag: tag,
-                            renotify: false,
+                            renotify: true,
                             click_action: 'https://vcheckair.vercel.app'
                         },
                         fcm_options: { link: 'https://vcheckair.vercel.app' }
