@@ -13,66 +13,53 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Handle background messages (when app is closed/background)
-messaging.onBackgroundMessage(async (payload) => {
-    console.log('Background message received:', payload);
+// Track last shown notification to prevent duplicates (works on both iOS & Android)
+let lastNotifTag = null;
+let lastNotifTime = 0;
 
-    // ── DUPLICATE PREVENTION ──────────────────────────────────
-    // If app window is visible/focused → skip showing notification
-    // (foreground handler in index.html will handle it instead)
-    const clientList = await clients.matchAll({
-        type: 'window',
-        includeUncontrolled: true
-    });
-    const isAppOpen = clientList.some(client =>
-        client.url.includes('vcheckair.vercel.app') &&
-        client.visibilityState === 'visible'
-    );
-    if (isAppOpen) {
-        console.log('App is open — skipping background notification to avoid duplicate');
-        return;
-    }
+messaging.onBackgroundMessage((payload) => {
+    console.log('Background message:', payload);
 
     const title = payload.notification?.title || 'Apple Air WiFi 🔔';
     const body  = payload.notification?.body  || 'You have a new notification';
     const url   = payload.data?.url || 'https://vcheckair.vercel.app';
+    const tag   = payload.data?.tag || 'apple-air-general';
 
-    // Use unique tag per notification type to prevent stacking
-    const tag = payload.data?.tag || 'apple-air-' + Date.now();
+    // Prevent duplicate: same tag within 5 seconds = skip
+    const now = Date.now();
+    if (tag === lastNotifTag && (now - lastNotifTime) < 5000) {
+        console.log('Duplicate notification blocked:', tag);
+        return;
+    }
+    lastNotifTag = tag;
+    lastNotifTime = now;
 
-    await self.registration.showNotification(title, {
-        body:              body,
-        icon:              '/icons/icon-192.png',
-        badge:             '/icons/icon-192.png',
-        vibrate:           [200, 100, 200, 100, 200],
+    return self.registration.showNotification(title, {
+        body:               body,
+        icon:               '/icons/icon-192.png',
+        badge:              '/icons/icon-192.png',
+        vibrate:            [200, 100, 200, 100, 200],
         requireInteraction: true,
-        tag:               tag,
-        renotify:          true,
-        data:              { url: url },
-        actions: [
-            { action: 'open',  title: '📱 Open' },
-            { action: 'close', title: '✕ Dismiss' }
-        ]
+        tag:                tag,
+        renotify:           false,
+        data:               { url: url }
     });
 });
 
-// Handle notification click
+// Handle notification click — open or focus app
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
-    if (event.action === 'close') return;
-
     const url = event.notification.data?.url || 'https://vcheckair.vercel.app';
-
     event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-            // Focus existing tab if open
-            for (const client of clientList) {
-                if (client.url.includes('vcheckair.vercel.app') && 'focus' in client) {
-                    return client.focus();
+        clients.matchAll({ type: 'window', includeUncontrolled: true })
+            .then((clientList) => {
+                for (const client of clientList) {
+                    if (client.url.includes('vcheckair.vercel.app') && 'focus' in client) {
+                        return client.focus();
+                    }
                 }
-            }
-            // Otherwise open new tab
-            return clients.openWindow(url);
-        })
+                return clients.openWindow(url);
+            })
+            .catch(() => clients.openWindow(url))
     );
 });
