@@ -1393,10 +1393,20 @@
             if(!message){alert('Please describe your issue');return;}
             btn.disabled=true; btn.textContent='Sending...';
             try {
-                await fetch(APPS_SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,voucherCode:code,issueType:issue,message})});
+                // Get FCM token for complaint notifications
+                let fcmToken = '';
+                try {
+                    if (window.fcmMessaging) {
+                        const VAPID_KEY = "BGeRhehk4k_iL9OfCIlKLEzT7RDxYcmkE-Pe1f8xXrAUE95Zhljn1WUsbq3y48lEB3K47yOzizNhXsTZK6oOrDo";
+                        fcmToken = await window.fcmMessaging.getToken({ vapidKey: VAPID_KEY }) || '';
+                    }
+                } catch(e) { console.log('FCM token fetch (non-critical):', e.message); }
+
+                await fetch(APPS_SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,voucherCode:code,issueType:issue,message,fcmToken})});
                 btn.textContent='✅ Sent!'; btn.style.background='#16a34a';
-                st.textContent='✅ Submitted! We will contact you soon.'; st.style.color='#16a34a'; st.classList.remove('hidden');
-                setTimeout(closeServiceForm,3000);
+                st.textContent='✅ Submitted! You will receive a notification with your SR number shortly.';
+                st.style.color='#16a34a'; st.classList.remove('hidden');
+                setTimeout(closeServiceForm,4000);
             } catch(e) {
                 btn.disabled=false; btn.textContent='Send Request';
                 st.textContent='⚠️ Failed. Please try again.'; st.style.color='#dc2626'; st.classList.remove('hidden');
