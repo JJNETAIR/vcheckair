@@ -89,13 +89,13 @@ async function sendFCMv1(accessToken, token, title, body) {
                             badge: 'https://vcheckair.vercel.app/icons/icon-192.png',
                             requireInteraction: true,
                             vibrate: [200, 100, 200],
-                            tag: 'apple-air-broadcast',
+                            tag: `apple-air-broadcast-${Date.now()}`,
                             renotify: true,
                             click_action: 'https://vcheckair.vercel.app'
                         },
                         fcm_options: { link: 'https://vcheckair.vercel.app' }
                     },
-                    data: { url: 'https://vcheckair.vercel.app', tag: 'apple-air-broadcast' }
+                    data: { url: 'https://vcheckair.vercel.app', tag: `apple-air-broadcast-${Date.now()}` }
                 }
             })
         }
