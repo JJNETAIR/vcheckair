@@ -16,14 +16,40 @@ const messaging = firebase.messaging();
 // Handle background messages
 messaging.onBackgroundMessage((payload) => {
     console.log('Background message:', payload);
-    self.registration.showNotification(
-        payload.notification?.title || 'Apple Air WiFi 🔔',
-        {
-            body: payload.notification?.body || 'You have a notification',
-            icon: '/icons/icon-192.png',
-            badge: '/icons/icon-192.png',
-            vibrate: [200, 100, 200],
-            data: { url: '/' }
-        }
+    
+    const title = payload.notification?.title || 'Apple Air WiFi 🔔';
+    const body = payload.notification?.body || 'You have a notification';
+    const url = payload.data?.url || '/';
+
+    self.registration.showNotification(title, {
+        body: body,
+        icon: '/icons/icon-192.png',
+        badge: '/icons/icon-192.png',
+        vibrate: [200, 100, 200, 100, 200],
+        requireInteraction: true,
+        tag: 'apple-air-notification',
+        renotify: true,
+        data: { url: url },
+        actions: [
+            { action: 'open', title: 'Open' },
+            { action: 'close', title: 'Dismiss' }
+        ]
+    });
+});
+
+// Handle notification click
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const url = event.notification.data?.url || '/';
+    if (event.action === 'close') return;
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+            for (const client of clientList) {
+                if (client.url.includes('vcheckair.vercel.app') && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            return clients.openWindow('https://vcheckair.vercel.app' + url);
+        })
     );
 });
