@@ -13,26 +13,21 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Track last shown notification to prevent duplicates (works on both iOS & Android)
-let lastNotifTag = null;
-let lastNotifTime = 0;
-
 messaging.onBackgroundMessage((payload) => {
-    console.log('Background message:', payload);
+    console.log('[SW] Background message received:', JSON.stringify(payload));
 
     const title = payload.notification?.title || 'Apple Air WiFi 🔔';
     const body  = payload.notification?.body  || 'You have a new notification';
-    const url   = payload.data?.url || 'https://vcheckair.vercel.app';
-    const tag   = payload.data?.tag || 'apple-air-general';
+    const url   = payload.data?.url  || 'https://vcheckair.vercel.app';
 
-    // Prevent duplicate: same tag within 5 seconds = skip
-    const now = Date.now();
-    if (tag === lastNotifTag && (now - lastNotifTime) < 5000) {
-        console.log('Duplicate notification blocked:', tag);
-        return;
-    }
-    lastNotifTag = tag;
-    lastNotifTime = now;
+    // Use unique tag from server — each notification type has unique tag
+    // broadcast: apple-air-broadcast-{timestamp}
+    // complaint: apple-air-sr-{srNumber}
+    // expiry:    apple-air-expiry-{voucherCode}
+    // fallback:  apple-air-{timestamp}
+    const tag = payload.data?.tag || ('apple-air-' + Date.now());
+
+    console.log('[SW] Showing notification with tag:', tag);
 
     return self.registration.showNotification(title, {
         body:               body,
@@ -41,7 +36,7 @@ messaging.onBackgroundMessage((payload) => {
         vibrate:            [200, 100, 200, 100, 200],
         requireInteraction: true,
         tag:                tag,
-        renotify:           false,
+        renotify:           true,  // ✅ Always show — tags are unique so no spam
         data:               { url: url }
     });
 });
