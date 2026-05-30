@@ -1412,28 +1412,39 @@
                 const p = await Notification.requestPermission();
                 if (p !== 'granted') throw new Error('denied');
 
+                // ✅ ANDROID FIX: Register SW and wait for it to be active
+                let swReg = null;
+                if ('serviceWorker' in navigator) {
+                    try {
+                        swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                        await navigator.serviceWorker.ready;
+                        console.log('✅ SW ready');
+                    } catch(swErr) { console.log('SW (non-critical):', swErr.message); }
+                }
+
                 if (window.fcmMessaging) {
-                    const t = await window.fcmMessaging.getToken({ vapidKey: VAPID_KEY });
+                    // Pass SW registration explicitly — fixes Android token generation
+                    const tokenOpts = { vapidKey: VAPID_KEY };
+                    if (swReg) tokenOpts.serviceWorkerRegistration = swReg;
+
+                    const t = await window.fcmMessaging.getToken(tokenOpts);
                     if (t) {
                         localStorage.setItem('fcm_subscribed', 'true');
+                        console.log('✅ FCM token:', t.slice(0,15) + '...');
 
-                        // Get current voucher info from session
                         const currentVoucher = window._currentVoucher || {};
                         const voucherCode = currentVoucher.code || '';
                         const expiryText  = currentVoucher.expiryText || '';
 
-                        // Clean expiry date DD/MM/YYYY
                         let cleanExpiry = '';
                         if (expiryText) {
                             try {
                                 const d = parseSheetDateString ? parseSheetDateString(expiryText) : new Date(expiryText);
-                                if (d && !isNaN(d.getTime())) {
-                                    cleanExpiry = d.toLocaleDateString('en-GB');
-                                }
+                                if (d && !isNaN(d.getTime())) cleanExpiry = d.toLocaleDateString('en-GB');
                             } catch(e) { cleanExpiry = expiryText.split(' ')[0]; }
                         }
 
-                        // Save to Subscribers sheet (for broadcast)
+                        // Save to Subscribers sheet (broadcast)
                         await fetch(APPS_SCRIPT_URL, {
                             method: 'POST', mode: 'no-cors',
                             headers: { 'Content-Type': 'application/json' },
@@ -1445,7 +1456,7 @@
                             })
                         });
 
-                        // Save to Tokens sheet (for expiry reminder)
+                        // Save to Tokens sheet (expiry reminder)
                         if (voucherCode && cleanExpiry) {
                             await fetch(APPS_SCRIPT_URL, {
                                 method: 'POST', mode: 'no-cors',
@@ -1458,8 +1469,9 @@
                                 })
                             });
                         }
-
-                        console.log('✅ Alerts setup: token saved to Subscribers + Tokens sheets');
+                        console.log('✅ Token saved to Subscribers + Tokens sheets');
+                    } else {
+                        throw new Error('Token empty — try again');
                     }
                 }
 
@@ -1468,6 +1480,7 @@
             } catch(e) {
                 btn.disabled = false; btn.textContent = '🔔 Alerts';
                 if (e.message === 'denied') alert('Please allow notifications in browser settings.');
+                else console.log('setupAlerts error:', e.message);
             }
         }
 
