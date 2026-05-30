@@ -68,10 +68,6 @@
                 </div>
             </div>
             <div class="flex gap-2">
-                <button onclick="setupAlerts()" id="alerts-btn" class="flex-1 py-3 px-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-700 font-medium flex items-center justify-center gap-2 active:scale-95 transition-transform text-sm">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-                    <span>Alerts</span>
-                </button>
                 <button onclick="openServiceForm()" class="flex-1 py-3 px-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-700 font-medium flex items-center justify-center gap-2 active:scale-95 transition-transform text-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                     <span>Service</span>
@@ -129,12 +125,25 @@
                 </div>
             </div>
 
-            <!-- Notify + Check Another side by side -->
-            <div id="notification-section" class="hidden space-y-0">
-                <button id="notify-me-btn" class="w-full py-2.5 px-4 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-600 text-sm font-medium flex items-center justify-center space-x-2 active:scale-95 transition-transform">
-                    <span>🔔</span><span>Notify Me 1 Day Before Expiry</span>
+            <!-- Notify Section -->
+            <div id="notification-section" class="hidden space-y-2">
+                <!-- Notify Me Button (Apple style) -->
+                <button id="notify-me-btn" class="w-full py-3 px-4 rounded-2xl text-sm font-medium flex items-center justify-center gap-2 transition-all duration-300 active:scale-95" style="background:#EBF5FF;border:1px solid #C0D9F5;color:#0071E3;">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                    <span>Notify Me 1 Day Before Expiry</span>
                 </button>
-                <p id="notify-status" class="text-xs text-center mt-1 text-gray-400 hidden"></p>
+
+                <!-- Status text -->
+                <p id="notify-status" class="text-xs text-center hidden" style="color:#86868B;"></p>
+
+                <!-- Alerts Active Indicator (hidden until reminder set) -->
+                <div id="alerts-indicator" class="hidden items-center justify-center gap-2 py-2">
+                    <span class="relative flex h-2.5 w-2.5">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style="background:#34C759;"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5" style="background:#34C759;"></span>
+                    </span>
+                    <span class="text-xs font-medium" style="color:#34C759;">Alerts Active</span>
+                </div>
             </div>
 
             <!-- Bottom buttons row -->
@@ -392,18 +401,19 @@
             const notifySection = document.getElementById('notification-section');
             const notifyBtn    = document.getElementById('notify-me-btn');
             const notifyStatus = document.getElementById('notify-status');
+            const indicator    = document.getElementById('alerts-indicator');
             if (!notifySection || !notifyBtn || !notifyStatus) return;
 
             // Show the section
             notifySection.classList.remove('hidden');
 
-            // Reset to default state first
-            notifyBtn.innerHTML = '<span>🔔</span><span>Notify Me 1 Day Before Expiry</span>';
-            notifyBtn.style.cssText = '';
+            // Reset to default Apple blue state
             notifyBtn.disabled = false;
-            notifyBtn.className = 'w-full py-2.5 px-4 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-600 text-sm font-medium flex items-center justify-center space-x-2 active:scale-95 transition-transform';
+            notifyBtn.style.cssText = 'background:#EBF5FF;border:1px solid #C0D9F5;color:#0071E3;width:100%;padding:12px;border-radius:16px;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:500;font-size:14px;';
+            notifyBtn.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg><span>Notify Me 1 Day Before Expiry</span>`;
             notifyStatus.textContent = '';
             notifyStatus.classList.add('hidden');
+            if (indicator) { indicator.classList.add('hidden'); indicator.classList.remove('flex'); }
 
             // Check IndexedDB for existing reminder for THIS voucher
             const code = voucherCode.toLowerCase();
@@ -421,13 +431,16 @@
                     getReq.onsuccess = () => {
                         db.close();
                         if (getReq.result) {
-                            // Already set for this voucher — show success state
-                            notifyBtn.innerHTML = '<span>✅</span><span>Reminder Set!</span>';
-                            notifyBtn.style.cssText = 'background:#f0fdf4;border:1px solid #86efac;color:#16a34a;width:100%;padding:10px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:500';
+                            // ✅ Already set — show Apple green success state
+                            notifyBtn.style.cssText = 'background:#F0FDF4;border:1px solid #BBF7D0;color:#16A34A;width:100%;padding:12px;border-radius:16px;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:500;font-size:14px;';
+                            notifyBtn.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg><span>Reminder Set!</span>`;
                             notifyBtn.disabled = true;
                             notifyStatus.textContent = `🔔 We will alert you on ${getReq.result}`;
-                            notifyStatus.style.color = '#16a34a';
+                            notifyStatus.style.color = '#16A34A';
+                            notifyStatus.style.fontWeight = '500';
                             notifyStatus.classList.remove('hidden');
+                            // Show pulsing green indicator
+                            if (indicator) { indicator.classList.remove('hidden'); indicator.classList.add('flex'); }
                         }
                     };
                 };
@@ -1248,6 +1261,7 @@
         async function setupFCMNotification(voucherCode, expiryText) {
             const btn = document.getElementById('notify-me-btn');
             const status = document.getElementById('notify-status');
+            const indicator = document.getElementById('alerts-indicator');
             btn.disabled = true;
             btn.innerHTML = '<span>⏳</span><span>Setting up...</span>';
             try {
@@ -1277,21 +1291,27 @@
                     req.onerror = () => reject(req.error);
                 });
 
-                // Get FCM token and save to Google Sheet for Vercel Cron
+                // ✅ Register SW first (critical for Android)
+                let swReg = null;
+                if ('serviceWorker' in navigator) {
+                    try {
+                        swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                        await navigator.serviceWorker.ready;
+                    } catch(e) { console.log('SW:', e.message); }
+                }
+
+                // Get FCM token
                 try {
                     if (window.fcmMessaging) {
-                        const fcmToken = await window.fcmMessaging.getToken({ vapidKey: VAPID_KEY });
+                        const tokenOpts = { vapidKey: VAPID_KEY };
+                        if (swReg) tokenOpts.serviceWorkerRegistration = swReg;
+                        const fcmToken = await window.fcmMessaging.getToken(tokenOpts);
                         if (fcmToken) {
-                            // Clean expiry date to DD/MM/YYYY only (strip time)
-                            const expiryDateObj = parseSheetDateString(expiryText);
-                            const cleanExpiryDate = expiryDateObj 
-                                ? expiryDateObj.toLocaleDateString('en-GB') 
-                                : expiryText.split(' ')[0];
+                            const cleanExpiryDate = expiryDate.toLocaleDateString('en-GB');
 
-                            // Save to Tokens sheet for expiry reminders
+                            // Save to Tokens sheet
                             await fetch(APPS_SCRIPT_URL, {
-                                method: 'POST',
-                                mode: 'no-cors',
+                                method: 'POST', mode: 'no-cors',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                     type: 'token',
@@ -1300,12 +1320,10 @@
                                     expiryDate: cleanExpiryDate
                                 })
                             });
-                            console.log('✅ FCM token saved to Tokens sheet, expiry:', cleanExpiryDate);
 
-                            // Save to Subscribers sheet for broadcast
+                            // Save to Subscribers sheet
                             await fetch(APPS_SCRIPT_URL, {
-                                method: 'POST',
-                                mode: 'no-cors',
+                                method: 'POST', mode: 'no-cors',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                     type: 'subscriber',
@@ -1314,38 +1332,51 @@
                                     subscribedAt: new Date().toLocaleDateString('en-GB')
                                 })
                             });
-                            console.log('✅ FCM token saved to Subscribers sheet');
+                            console.log('✅ Token saved');
                         }
                     }
                 } catch(e) { console.log('Token save (non-critical):', e.message); }
 
-                // Show instant confirmation notification
-                // iOS: new Notification() works
-                // Android: must use ServiceWorker showNotification()
+                // Show confirmation notification
                 try {
-                    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-                        const reg = await navigator.serviceWorker.ready;
-                        await reg.showNotification('Apple Air WiFi 🔔', {
-                            body: `Reminder set! We will alert you on ${alertDateStr}`,
-                            icon: '/icons/icon-192.png'
-                        });
-                    } else {
+                    const reg = await navigator.serviceWorker.ready;
+                    await reg.showNotification('Apple Air WiFi 🔔', {
+                        body: `Reminder set! We will alert you on ${alertDateStr}`,
+                        icon: '/icons/icon-192.png'
+                    });
+                } catch(e) {
+                    try {
                         new Notification('Apple Air WiFi 🔔', {
                             body: `Reminder set! We will alert you on ${alertDateStr}`,
                             icon: '/icons/icon-192.png'
                         });
-                    }
-                } catch(e) { console.log('Notification display:', e.message); }
+                    } catch(e2) { console.log('Notif display:', e2.message); }
+                }
 
-                // Success UI
-                btn.innerHTML = '<span>✅</span><span>Reminder Set!</span>';
-                btn.style.cssText = 'background:#f0fdf4;border:1px solid #86efac;color:#16a34a;width:100%;padding:10px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:500';
+                // ✅ Apple-style success UI
+                btn.style.cssText = 'background:#F0FDF4;border:1px solid #BBF7D0;color:#16A34A;width:100%;padding:12px;border-radius:16px;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:500;font-size:14px;';
+                btn.innerHTML = `
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    <span>Reminder Set!</span>`;
+                btn.disabled = true;
+
+                // Show date
                 status.textContent = `🔔 We will alert you on ${alertDateStr}`;
-                status.style.color = '#16a34a';
+                status.style.color = '#16A34A';
+                status.style.fontWeight = '500';
                 status.classList.remove('hidden');
+
+                // ✅ Show pulsing green "Alerts Active" indicator
+                indicator.classList.remove('hidden');
+                indicator.classList.add('flex');
+
             } catch(err) {
                 btn.disabled = false;
-                btn.innerHTML = '<span>🔔</span><span>Notify Me 1 Day Before Expiry</span>';
+                btn.style.cssText = '';
+                btn.style.background = '#EBF5FF';
+                btn.style.border = '1px solid #C0D9F5';
+                btn.style.color = '#0071E3';
+                btn.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg><span>Notify Me 1 Day Before Expiry</span>`;
                 status.textContent = '⚠️ ' + err.message;
                 status.classList.remove('hidden');
             }
