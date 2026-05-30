@@ -205,6 +205,10 @@
                 <input id="svc-name" type="text" placeholder="Enter your name" class="w-full mt-1 text-sm text-[#1D1D1F] bg-transparent outline-none placeholder-gray-300"/>
             </div>
             <div class="bg-white rounded-2xl px-4 py-3 shadow-sm">
+                <label class="text-xs font-medium text-[#86868B] uppercase tracking-wide">Flat / Room #</label>
+                <input id="svc-room" type="text" placeholder="E.g. Flat 101, Room 5" class="w-full mt-1 text-sm text-[#1D1D1F] bg-transparent outline-none placeholder-gray-300"/>
+            </div>
+            <div class="bg-white rounded-2xl px-4 py-3 shadow-sm">
                 <label class="text-xs font-medium text-[#86868B] uppercase tracking-wide">Voucher Code</label>
                 <input id="svc-code" type="text" placeholder="E.g. 91706585" class="w-full mt-1 text-sm text-[#1D1D1F] bg-transparent outline-none placeholder-gray-300"/>
             </div>
@@ -1597,30 +1601,31 @@
         }
         function closeServiceForm(){
             document.getElementById('view-service').classList.add('hidden');
-            ['svc-name','svc-code','svc-message'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+            ['svc-name','svc-room','svc-code','svc-message'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';})
             const s=document.getElementById('svc-issue'); if(s) s.value='';
             const st=document.getElementById('svc-status'); if(st) st.classList.add('hidden');
             const b=document.getElementById('svc-submit'); if(b){b.disabled=false;b.textContent='Send Request';b.style.background='';}
         }
         async function submitServiceRequest(){
-            const name=document.getElementById('svc-name').value.trim();
-            const code=document.getElementById('svc-code').value.trim();
-            const issue=document.getElementById('svc-issue').value;
-            const message=document.getElementById('svc-message').value.trim();
-            const st=document.getElementById('svc-status');
-            const btn=document.getElementById('svc-submit');
+            const name    = document.getElementById('svc-name').value.trim();
+            const room    = document.getElementById('svc-room') ? document.getElementById('svc-room').value.trim() : '';
+            const code    = document.getElementById('svc-code').value.trim();
+            const issue   = document.getElementById('svc-issue').value;
+            const message = document.getElementById('svc-message').value.trim();
+            const st  = document.getElementById('svc-status');
+            const btn = document.getElementById('svc-submit');
             if(!name){alert('Please enter your name');return;}
             if(!code){alert('Please enter your voucher code');return;}
             if(!issue){alert('Please select an issue type');return;}
             if(!message){alert('Please describe your issue');return;}
             btn.disabled=true; btn.textContent='Sending...';
             try {
-                // Get FCM token for complaint notifications
+                // Get FCM token — try all methods
                 let fcmToken = '';
                 try {
-                    // First try: use token saved when user clicked Enable
+                    // Method 1: from localStorage (saved when Enable clicked)
                     fcmToken = localStorage.getItem('complaint_fcm_token') || '';
-                    // Second try: get fresh token if permission already granted
+                    // Method 2: fresh token if permission granted
                     if (!fcmToken && window.fcmMessaging && Notification.permission === 'granted') {
                         let swReg = null;
                         if ('serviceWorker' in navigator) {
@@ -1632,15 +1637,20 @@
                         const tokenOpts = { vapidKey: VAPID_KEY };
                         if (swReg) tokenOpts.serviceWorkerRegistration = swReg;
                         fcmToken = await window.fcmMessaging.getToken(tokenOpts) || '';
+                        if (fcmToken) localStorage.setItem('complaint_fcm_token', fcmToken);
                     }
-                    console.log('✅ FCM token for complaint:', fcmToken ? 'got it' : 'empty');
-                } catch(e) { console.log('FCM token fetch (non-critical):', e.message); }
+                    console.log('FCM token:', fcmToken ? 'got it ✅' : 'empty ❌');
+                } catch(e) { console.log('FCM (non-critical):', e.message); }
 
-                await fetch(APPS_SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,voucherCode:code,issueType:issue,message,fcmToken})});
-                btn.textContent='✅ Sent!'; btn.style.background='#16a34a';
+                await fetch(APPS_SCRIPT_URL, {
+                    method: 'POST', mode: 'no-cors',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name, room: room||'-', voucherCode:code, issueType:issue, message, fcmToken})
+                });
+                btn.textContent='✅ Sent!'; btn.style.background='#16A34A';
                 st.textContent='✅ Submitted! You will receive a notification with your SR number shortly.';
-                st.style.color='#16a34a'; st.classList.remove('hidden');
-                setTimeout(closeServiceForm,4000);
+                st.style.color='#16A34A'; st.classList.remove('hidden');
+                setTimeout(closeServiceForm, 4000);
             } catch(e) {
                 btn.disabled=false; btn.textContent='Send Request';
                 st.textContent='⚠️ Failed. Please try again.'; st.style.color='#dc2626'; st.classList.remove('hidden');
