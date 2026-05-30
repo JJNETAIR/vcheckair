@@ -187,6 +187,19 @@
             </div>
         </div>
         <div class="flex-1 overflow-y-auto px-6 pb-8 space-y-3">
+            <!-- 🔔 Notification Enable Banner -->
+            <div id="complaint-notif-banner" class="rounded-2xl px-4 py-3 flex items-center gap-3" style="background:#EBF5FF;border:1px solid #C0D9F5;">
+                <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style="background:#0071E3;">
+                    <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                </div>
+                <div class="flex-1">
+                    <p class="text-xs font-semibold" style="color:#1D1D1F;">Get notified when resolved!</p>
+                    <p class="text-xs" style="color:#86868B;">Enable to receive SR updates</p>
+                </div>
+                <button onclick="enableComplaintNotif()" id="complaint-notif-btn" class="text-xs font-semibold px-3 py-1.5 rounded-xl transition-all" style="background:#0071E3;color:white;">
+                    Enable
+                </button>
+            </div>
             <div class="bg-white rounded-2xl px-4 py-3 shadow-sm">
                 <label class="text-xs font-medium text-[#86868B] uppercase tracking-wide">Your Name</label>
                 <input id="svc-name" type="text" placeholder="Enter your name" class="w-full mt-1 text-sm text-[#1D1D1F] bg-transparent outline-none placeholder-gray-300"/>
@@ -1516,7 +1529,72 @@
         }
 
         // ── SERVICE FORM ─────────────────────────────────────────
-        function openServiceForm(){document.getElementById('view-service').classList.remove('hidden');}
+        function openServiceForm() {
+            document.getElementById('view-service').classList.remove('hidden');
+            // Check notification permission state
+            const banner = document.getElementById('complaint-notif-banner');
+            const btn = document.getElementById('complaint-notif-btn');
+            if (!banner || !btn) return;
+            if (Notification.permission === 'granted') {
+                // Already enabled — show green indicator
+                banner.style.background = '#F0FDF4';
+                banner.style.border = '1px solid #BBF7D0';
+                btn.textContent = '✅ Enabled';
+                btn.style.background = '#16A34A';
+                btn.disabled = true;
+            } else {
+                // Not enabled — show blue enable button
+                banner.style.background = '#EBF5FF';
+                banner.style.border = '1px solid #C0D9F5';
+                btn.textContent = 'Enable';
+                btn.style.background = '#0071E3';
+                btn.disabled = false;
+            }
+        }
+
+        async function enableComplaintNotif() {
+            const btn = document.getElementById('complaint-notif-btn');
+            const banner = document.getElementById('complaint-notif-banner');
+            btn.textContent = '⏳';
+            btn.disabled = true;
+            try {
+                // ✅ Register SW first (Android fix)
+                let swReg = null;
+                if ('serviceWorker' in navigator) {
+                    try {
+                        swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                        await navigator.serviceWorker.ready;
+                    } catch(e) { console.log('SW:', e.message); }
+                }
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    // Get and save FCM token
+                    if (window.fcmMessaging) {
+                        const tokenOpts = { vapidKey: VAPID_KEY };
+                        if (swReg) tokenOpts.serviceWorkerRegistration = swReg;
+                        const t = await window.fcmMessaging.getToken(tokenOpts);
+                        if (t) {
+                            localStorage.setItem('complaint_fcm_token', t);
+                            console.log('✅ Complaint FCM token saved');
+                        }
+                    }
+                    // Show green state
+                    banner.style.background = '#F0FDF4';
+                    banner.style.border = '1px solid #BBF7D0';
+                    btn.textContent = '✅ Enabled';
+                    btn.style.background = '#16A34A';
+                    btn.disabled = true;
+                } else {
+                    btn.textContent = 'Enable';
+                    btn.disabled = false;
+                    alert('Please allow notifications in browser settings to receive SR updates.');
+                }
+            } catch(e) {
+                btn.textContent = 'Enable';
+                btn.disabled = false;
+                console.log('enableComplaintNotif error:', e.message);
+            }
+        }
         function closeServiceForm(){
             document.getElementById('view-service').classList.add('hidden');
             ['svc-name','svc-code','svc-message'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
@@ -1540,17 +1618,22 @@
                 // Get FCM token for complaint notifications
                 let fcmToken = '';
                 try {
-                    if (window.fcmMessaging) {
-                        const VAPID_KEY = "BGeRhehk4k_iL9OfCIlKLEzT7RDxYcmkE-Pe1f8xXrAUE95Zhljn1WUsbq3y48lEB3K47yOzizNhXsTZK6oOrDo";
-                        // Request permission first if not already granted
-                        if (Notification.permission !== 'granted') {
-                            await Notification.requestPermission();
+                    // First try: use token saved when user clicked Enable
+                    fcmToken = localStorage.getItem('complaint_fcm_token') || '';
+                    // Second try: get fresh token if permission already granted
+                    if (!fcmToken && window.fcmMessaging && Notification.permission === 'granted') {
+                        let swReg = null;
+                        if ('serviceWorker' in navigator) {
+                            try {
+                                swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                                await navigator.serviceWorker.ready;
+                            } catch(e) {}
                         }
-                        if (Notification.permission === 'granted') {
-                            fcmToken = await window.fcmMessaging.getToken({ vapidKey: VAPID_KEY }) || '';
-                        }
-                        console.log('✅ FCM token for complaint:', fcmToken ? 'got it' : 'empty');
+                        const tokenOpts = { vapidKey: VAPID_KEY };
+                        if (swReg) tokenOpts.serviceWorkerRegistration = swReg;
+                        fcmToken = await window.fcmMessaging.getToken(tokenOpts) || '';
                     }
+                    console.log('✅ FCM token for complaint:', fcmToken ? 'got it' : 'empty');
                 } catch(e) { console.log('FCM token fetch (non-critical):', e.message); }
 
                 await fetch(APPS_SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,voucherCode:code,issueType:issue,message,fcmToken})});
