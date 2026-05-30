@@ -390,7 +390,48 @@
         // 🔔 REMINDER STORAGE MODULE
         function setupNotification(expiryDateString, voucherCode) {
             const notifySection = document.getElementById('notification-section');
-            if (notifySection) notifySection.classList.remove('hidden');
+            const notifyBtn    = document.getElementById('notify-me-btn');
+            const notifyStatus = document.getElementById('notify-status');
+            if (!notifySection || !notifyBtn || !notifyStatus) return;
+
+            // Show the section
+            notifySection.classList.remove('hidden');
+
+            // Reset to default state first
+            notifyBtn.innerHTML = '<span>🔔</span><span>Notify Me 1 Day Before Expiry</span>';
+            notifyBtn.style.cssText = '';
+            notifyBtn.disabled = false;
+            notifyBtn.className = 'w-full py-2.5 px-4 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-600 text-sm font-medium flex items-center justify-center space-x-2 active:scale-95 transition-transform';
+            notifyStatus.textContent = '';
+            notifyStatus.classList.add('hidden');
+
+            // Check IndexedDB for existing reminder for THIS voucher
+            const code = voucherCode.toLowerCase();
+            try {
+                const req = indexedDB.open('AppleAirDB', 1);
+                req.onupgradeneeded = e => {
+                    if (!e.target.result.objectStoreNames.contains('alerts'))
+                        e.target.result.createObjectStore('alerts');
+                };
+                req.onsuccess = e => {
+                    const db = e.target.result;
+                    const tx = db.transaction('alerts', 'readonly');
+                    const store = tx.objectStore('alerts');
+                    const getReq = store.get(`alert_date_${code}`);
+                    getReq.onsuccess = () => {
+                        db.close();
+                        if (getReq.result) {
+                            // Already set for this voucher — show success state
+                            notifyBtn.innerHTML = '<span>✅</span><span>Reminder Set!</span>';
+                            notifyBtn.style.cssText = 'background:#f0fdf4;border:1px solid #86efac;color:#16a34a;width:100%;padding:10px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:500';
+                            notifyBtn.disabled = true;
+                            notifyStatus.textContent = `🔔 We will alert you on ${getReq.result}`;
+                            notifyStatus.style.color = '#16a34a';
+                            notifyStatus.classList.remove('hidden');
+                        }
+                    };
+                };
+            } catch(e) { console.log('IndexedDB check:', e.message); }
         }
 
         // ── STREAM LIVE VERIFICATION ──────────────────────────────
@@ -1457,7 +1498,13 @@
                 try {
                     if (window.fcmMessaging) {
                         const VAPID_KEY = "BGeRhehk4k_iL9OfCIlKLEzT7RDxYcmkE-Pe1f8xXrAUE95Zhljn1WUsbq3y48lEB3K47yOzizNhXsTZK6oOrDo";
-                        fcmToken = await window.fcmMessaging.getToken({ vapidKey: VAPID_KEY }) || '';
+                        // Request permission first if not already granted
+                        if (Notification.permission !== 'granted') {
+                            await Notification.requestPermission();
+                        }
+                        if (Notification.permission === 'granted') {
+                            fcmToken = await window.fcmMessaging.getToken({ vapidKey: VAPID_KEY }) || '';
+                        }
                         console.log('✅ FCM token for complaint:', fcmToken ? 'got it' : 'empty');
                     }
                 } catch(e) { console.log('FCM token fetch (non-critical):', e.message); }
