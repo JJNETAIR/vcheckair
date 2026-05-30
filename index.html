@@ -519,6 +519,13 @@
 
                 setupNotification(foundVoucher.expiryText, foundVoucher.code);
                 updateProgressBar(foundVoucher.startTime, foundVoucher.expiryText);
+
+                // ✅ Save current voucher context for setupAlerts()
+                window._currentVoucher = {
+                    code: foundVoucher.code,
+                    expiryText: foundVoucher.expiryText
+                };
+
                 const notifyBtn = document.getElementById('notify-me-btn');
                 if (notifyBtn) {
                     notifyBtn.onclick = () => setupFCMNotification(foundVoucher.code, foundVoucher.expiryText);
@@ -1262,6 +1269,7 @@
                                 body: JSON.stringify({
                                     type: 'subscriber',
                                     fcmToken: fcmToken,
+                                    voucherCode: voucherCode.toUpperCase(),
                                     subscribedAt: new Date().toLocaleDateString('en-GB')
                                 })
                             });
@@ -1357,17 +1365,68 @@
 
         // ── ALERTS ───────────────────────────────────────────────
         async function setupAlerts() {
-            const btn=document.getElementById('alerts-btn');
+            const btn = document.getElementById('alerts-btn');
             try {
-                btn.disabled=true; btn.textContent='⏳ Setting up...';
-                const p=await Notification.requestPermission();
-                if(p!=='granted') throw new Error('denied');
-                if(window.fcmMessaging){const t=await window.fcmMessaging.getToken({vapidKey:VAPID_KEY});if(t) localStorage.setItem('fcm_subscribed','true');}
-                btn.textContent='✅ Alerts On';
-                btn.style.cssText='flex:1;background:#f0fdf4;border:1px solid #86efac;color:#16a34a;border-radius:12px;padding:12px;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:8px';
+                btn.disabled = true; btn.textContent = '⏳ Setting up...';
+                const p = await Notification.requestPermission();
+                if (p !== 'granted') throw new Error('denied');
+
+                if (window.fcmMessaging) {
+                    const t = await window.fcmMessaging.getToken({ vapidKey: VAPID_KEY });
+                    if (t) {
+                        localStorage.setItem('fcm_subscribed', 'true');
+
+                        // Get current voucher info from session
+                        const currentVoucher = window._currentVoucher || {};
+                        const voucherCode = currentVoucher.code || '';
+                        const expiryText  = currentVoucher.expiryText || '';
+
+                        // Clean expiry date DD/MM/YYYY
+                        let cleanExpiry = '';
+                        if (expiryText) {
+                            try {
+                                const d = parseSheetDateString ? parseSheetDateString(expiryText) : new Date(expiryText);
+                                if (d && !isNaN(d.getTime())) {
+                                    cleanExpiry = d.toLocaleDateString('en-GB');
+                                }
+                            } catch(e) { cleanExpiry = expiryText.split(' ')[0]; }
+                        }
+
+                        // Save to Subscribers sheet (for broadcast)
+                        await fetch(APPS_SCRIPT_URL, {
+                            method: 'POST', mode: 'no-cors',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                type: 'subscriber',
+                                fcmToken: t,
+                                voucherCode: voucherCode,
+                                subscribedAt: new Date().toLocaleDateString('en-GB')
+                            })
+                        });
+
+                        // Save to Tokens sheet (for expiry reminder)
+                        if (voucherCode && cleanExpiry) {
+                            await fetch(APPS_SCRIPT_URL, {
+                                method: 'POST', mode: 'no-cors',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    type: 'token',
+                                    fcmToken: t,
+                                    voucherCode: voucherCode.toUpperCase(),
+                                    expiryDate: cleanExpiry
+                                })
+                            });
+                        }
+
+                        console.log('✅ Alerts setup: token saved to Subscribers + Tokens sheets');
+                    }
+                }
+
+                btn.textContent = '✅ Alerts On';
+                btn.style.cssText = 'flex:1;background:#f0fdf4;border:1px solid #86efac;color:#16a34a;border-radius:12px;padding:12px;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:8px';
             } catch(e) {
-                btn.disabled=false; btn.textContent='🔔 Alerts';
-                if(e.message==='denied') alert('Please allow notifications in browser settings.');
+                btn.disabled = false; btn.textContent = '🔔 Alerts';
+                if (e.message === 'denied') alert('Please allow notifications in browser settings.');
             }
         }
 
