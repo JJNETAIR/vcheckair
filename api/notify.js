@@ -96,7 +96,8 @@ async function sendFCMv1(accessToken, token, voucherCode) {
                     },
                     data: {
                         voucher_code: voucherCode,
-                        url: 'https://vcheckair.vercel.app'
+                        url: 'https://vcheckair.vercel.app',
+                        tag: `apple-air-expiry-${voucherCode}`
                     }
                 }
             })
