@@ -5,9 +5,18 @@
 
 const SHEET_ID = '1F8TUOpY9vudo9MsTWOwHwLlBKi1P6_ayikucdTjyrbg';
 const PROJECT_ID = 'apple-air';
+const SECRET_KEY = 'appleair2026';
 
 export default async function handler(req, res) {
     try {
+        // ── SECRET KEY PROTECTION ─────────────────────────────
+        // Vercel cron passes no key (allowed), manual calls need ?key=appleair2026
+        const isVercelCron = req.headers['x-vercel-cron'] === '1';
+        const providedKey = req.query?.key || '';
+        if (!isVercelCron && providedKey !== SECRET_KEY) {
+            return res.status(401).json({ success: false, error: 'Unauthorized' });
+        }
+
         console.log('Apple Air Cron Started:', new Date().toISOString());
 
         // Step 1: Get OAuth2 access token using service account
