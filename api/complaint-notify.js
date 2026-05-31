@@ -38,7 +38,7 @@ export default async function handler(req, res) {
         }
 
         const accessToken = await getAccessToken();
-        await sendFCMv1(accessToken, fcmToken, title, body, srNumber);
+        await sendFCMv1(accessToken, fcmToken, title, body, srNumber, type);
 
         console.log(`✅ Sent: ${srNumber} (${type})`);
         return res.status(200).json({ success: true, srNumber, type });
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
     }
 }
 
-async function sendFCMv1(accessToken, token, title, body, srNumber) {
+async function sendFCMv1(accessToken, token, title, body, srNumber, type) {
     const tag = `apple-air-sr-${srNumber}-${type}-${Date.now()}`;
 
     const response = await fetch(
