@@ -38,8 +38,6 @@ export default async function handler(req, res) {
         }
 
         const accessToken = await getAccessToken();
-
-        // ✅ Pass srNumber correctly to sendFCMv1
         await sendFCMv1(accessToken, fcmToken, title, body, srNumber);
 
         console.log(`✅ Sent: ${srNumber} (${type})`);
@@ -51,9 +49,8 @@ export default async function handler(req, res) {
     }
 }
 
-// ✅ srNumber now properly received as parameter
 async function sendFCMv1(accessToken, token, title, body, srNumber) {
-    const tag = `apple-air-sr-${srNumber}`; // ✅ unique per complaint
+    const tag = `apple-air-sr-${srNumber}`;
 
     const response = await fetch(
         `https://fcm.googleapis.com/v1/projects/${PROJECT_ID}/messages:send`,
@@ -66,28 +63,30 @@ async function sendFCMv1(accessToken, token, title, body, srNumber) {
             body: JSON.stringify({
                 message: {
                     token,
-                    notification: { title, body },
-                    webpush: {
-                        headers: { 'Urgency': 'high' },
-                        notification: {
-                            icon: 'https://vcheckair.vercel.app/icons/icon-192.png',
-                            badge: 'https://vcheckair.vercel.app/icons/icon-192.png',
-                            requireInteraction: true,
-                            vibrate: [200, 100, 200],
-                            tag: tag,
-                            renotify: true,
-                            click_action: 'https://vcheckair.vercel.app'
-                        },
-                        fcm_options: { link: 'https://vcheckair.vercel.app' }
+                    // ✅ DATA-ONLY message — forces SW to handle it
+                    // No 'notification' field = Chrome won't intercept it
+                    data: {
+                        title: title,
+                        body: body,
+                        tag: tag,
+                        url: 'https://vcheckair.vercel.app',
+                        type: 'complaint'
                     },
-                    data: { url: 'https://vcheckair.vercel.app', tag: tag }
+                    webpush: {
+                        headers: {
+                            'Urgency': 'high',
+                            'TTL': '86400'
+                        },
+                        fcm_options: {
+                            link: 'https://vcheckair.vercel.app'
+                        }
+                    }
                 }
             })
         }
     );
     const result = await response.json();
     if (!response.ok) {
-        // Log the specific FCM error
         const errCode = result?.error?.details?.[0]?.errorCode || result?.error?.status || 'UNKNOWN';
         console.error('FCM error:', errCode, JSON.stringify(result));
         throw new Error(JSON.stringify(result));
@@ -119,21 +118,10 @@ async function getAccessToken() {
 async function createJWT(header, payload, privateKeyPem) {
     const encode = obj => btoa(JSON.stringify(obj)).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
     const signingInput = `${encode(header)}.${encode(payload)}`;
-    const pemContents = privateKeyPem
-        .replace('-----BEGIN PRIVATE KEY-----','')
-        .replace('-----END PRIVATE KEY-----','')
-        .replace(/\s/g,'');
+    const pemContents = privateKeyPem.replace('-----BEGIN PRIVATE KEY-----','').replace('-----END PRIVATE KEY-----','').replace(/\s/g,'');
     const binaryKey = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
-    const cryptoKey = await crypto.subtle.importKey(
-        'pkcs8', binaryKey.buffer,
-        { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-        false, ['sign']
-    );
-    const signature = await crypto.subtle.sign(
-        'RSASSA-PKCS1-v1_5', cryptoKey,
-        new TextEncoder().encode(signingInput)
-    );
-    const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
-        .replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+    const cryptoKey = await crypto.subtle.importKey('pkcs8', binaryKey.buffer, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+    const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, new TextEncoder().encode(signingInput));
+    const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
     return `${signingInput}.${sigB64}`;
 }
