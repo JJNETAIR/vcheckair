@@ -55,6 +55,30 @@
                 <input type="text" id="voucher-input" placeholder="e.g. 123456" autocomplete="off" class="w-full px-5 py-4 bg-white/50 border border-gray-200 rounded-2xl text-base font-medium text-center uppercase focus:outline-none focus:border-blue-500 focus:bg-white shadow-inner">
                 <button onclick="streamLiveVerification()" class="w-full py-4 bg-[#0071E3] hover:bg-[#0077ED] text-white font-medium rounded-2xl shadow-md">Check Validity</button>
             </div>
+
+            <!-- My Voucher Button — hidden until user saves a voucher -->
+            <div id="my-voucher-container" class="hidden">
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="flex-1 h-px bg-gray-200"></div>
+                    <span class="text-xs text-[#86868B]">or</span>
+                    <div class="flex-1 h-px bg-gray-200"></div>
+                </div>
+                <button onclick="loadMyVoucher()" id="my-voucher-btn" class="w-full py-4 rounded-2xl border flex items-center gap-3 px-5 active:scale-95 transition-all duration-200" style="background:#F5F5F7;border-color:#E5E5EA;">
+                    <!-- Apple Human SF Symbol -->
+                    <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#0071E3;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+                            <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 text-left">
+                        <p class="text-sm font-semibold text-[#1D1D1F]">My Voucher</p>
+                        <p id="my-voucher-subtitle" class="text-xs text-[#86868B]">Tap to view your voucher info</p>
+                    </div>
+                    <svg width="16" height="16" fill="none" stroke="#86868B" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </button>
+            </div>
             <!-- Install App Button -->
             <div id="install-container" class="hidden space-y-2">
                 <button onclick="installApp()" class="w-full py-3 px-4 rounded-xl bg-gray-50 border border-gray-200 text-gray-700 font-medium flex items-center justify-center gap-2 active:scale-95 transition-transform">
@@ -597,6 +621,14 @@
                     expiryText: foundVoucher.expiryText
                 };
 
+                // ✅ Save for My Voucher feature
+                saveMyVoucher(
+                    foundVoucher.code,
+                    foundVoucher.expiryText,
+                    foundVoucher.startTime,
+                    foundVoucher.userName || ''
+                );
+
                 const notifyBtn = document.getElementById('notify-me-btn');
                 if (notifyBtn) {
                     notifyBtn.onclick = () => setupFCMNotification(foundVoucher.code, foundVoucher.expiryText);
@@ -734,6 +766,7 @@
 
         // Load history when speed test tab opens
         document.addEventListener('DOMContentLoaded', renderHistory);
+        document.addEventListener('DOMContentLoaded', checkMyVoucherOnLoad);
 
         // ── WIFI SIGNAL DETECTION ──────────────────────────────────
         function updateWifiSignal(overrideMbps) {
@@ -1573,6 +1606,45 @@
         }
 
         // ── SERVICE FORM ─────────────────────────────────────────
+        // ── MY VOUCHER FEATURE ────────────────────────────────────
+        function saveMyVoucher(code, expiryText, startTime, userName) {
+            const data = { code, expiryText, startTime, userName, savedAt: new Date().toLocaleDateString('en-GB') };
+            localStorage.setItem('my_voucher', JSON.stringify(data));
+            showMyVoucherButton(code, expiryText);
+        }
+
+        function showMyVoucherButton(code, expiryText) {
+            const container = document.getElementById('my-voucher-container');
+            const subtitle  = document.getElementById('my-voucher-subtitle');
+            if (!container) return;
+            container.classList.remove('hidden');
+            if (subtitle && code) {
+                subtitle.textContent = `Code: ${code}`;
+            }
+        }
+
+        function checkMyVoucherOnLoad() {
+            const saved = localStorage.getItem('my_voucher');
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    showMyVoucherButton(data.code, data.expiryText);
+                } catch(e) {}
+            }
+        }
+
+        function loadMyVoucher() {
+            const saved = localStorage.getItem('my_voucher');
+            if (!saved) return;
+            try {
+                const data = JSON.parse(saved);
+                // Auto-fill and check
+                const input = document.getElementById('voucher-input');
+                if (input) input.value = data.code;
+                streamLiveVerification();
+            } catch(e) {}
+        }
+
         function openServiceForm() {
             document.getElementById('view-service').classList.remove('hidden');
             // Check notification permission state
