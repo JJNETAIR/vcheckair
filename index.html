@@ -562,7 +562,57 @@
                     return;
                 }
 
-                const sheetSaysValid = foundVoucher.status.includes('valid');
+                // ── NEW UNACTIVATED VOUCHER ───────────────────────
+                // If voucher exists in sheet but no startTime → not activated yet
+                const isNewVoucher = !foundVoucher.startTime || foundVoucher.startTime.trim() === '' || foundVoucher.startTime === '--';
+
+                if (isNewVoucher) {
+                    document.getElementById('dash-code-display').innerText = foundVoucher.code;
+                    document.getElementById('dash-user-text').innerText = 'New Subscriber';
+                    document.getElementById('status-icon-expired').classList.add('hidden');
+                    document.getElementById('status-icon-active').classList.remove('hidden');
+                    document.getElementById('dash-status-title').innerText = 'Voucher Active';
+                    document.getElementById('dash-status-title').className = 'text-base font-semibold tracking-tight leading-tight text-emerald-600';
+                    document.getElementById('dash-status-badge').innerText = 'Valid';
+                    document.getElementById('dash-status-badge').className = 'text-xs font-semibold px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200';
+                    document.getElementById('dash-time').innerText = 'Update soon';
+                    document.getElementById('dash-time').className = 'text-xs font-semibold text-right max-w-[200px] text-gray-400 italic';
+                    document.getElementById('dash-data').innerText = 'Update soon';
+                    document.getElementById('dash-data').className = 'text-xs font-semibold text-right max-w-[200px] text-gray-400 italic';
+                    document.getElementById('dash-speed').innerText = 'Update soon';
+                    document.getElementById('dash-speed').className = 'text-xs font-medium bg-orange-50 text-orange-500 px-3 py-1 rounded-md';
+
+                    // Hide notification section — no expiry date yet
+                    document.getElementById('notification-section').classList.add('hidden');
+
+                    // Show welcome banner
+                    const existingBanner = document.getElementById('new-voucher-banner');
+                    if (!existingBanner) {
+                        const progressSection = document.getElementById('progress-section') || document.getElementById('notification-section');
+                        if (progressSection) {
+                            const banner = document.createElement('div');
+                            banner.id = 'new-voucher-banner';
+                            banner.style.cssText = 'background:#EBF5FF;border:0.5px solid #C0D9F5;border-radius:14px;padding:12px 14px;margin-top:8px;display:flex;gap:10px;align-items:flex-start;';
+                            banner.innerHTML = `
+                                <div style="width:28px;height:28px;background:#0071E3;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <svg width="14" height="14" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                </div>
+                                <div>
+                                    <p style="font-size:13px;font-weight:600;color:#0071E3;margin:0 0 2px;">Welcome to Apple Air! 🎉</p>
+                                    <p style="font-size:12px;color:#3B82F6;margin:0;line-height:1.4;">Your voucher is valid. Full details will be available within 24 hours once activated.</p>
+                                </div>`;
+                            progressSection.parentNode.insertBefore(banner, progressSection);
+                        }
+                    }
+
+                    renderView('view-dashboard');
+                    return;
+                }
+
+                // Remove welcome banner if exists (user re-checks after activation)
+                const oldBanner = document.getElementById('new-voucher-banner');
+                if (oldBanner) oldBanner.remove();
+                // ─────────────────────────────────────────────────
                 const today = new Date();
                 const expiryDate = parseSheetDateString(foundVoucher.expiryText);
                 let daysRemainingText = '--', isExpired = !sheetSaysValid;
