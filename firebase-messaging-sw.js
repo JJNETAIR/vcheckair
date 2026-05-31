@@ -13,31 +13,22 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-    console.log('[SW] Background message:', JSON.stringify(payload));
+    console.log('[SW] Background message received');
 
-    // Handle BOTH notification messages AND data-only messages
-    const title = payload.notification?.title 
-                || payload.data?.title 
-                || 'Apple Air WiFi 🔔';
-    
-    const body  = payload.notification?.body  
-                || payload.data?.body  
-                || 'You have a new notification';
-    
-    const url   = payload.data?.url   || 'https://vcheckair.vercel.app';
-    const tag   = payload.data?.tag   || ('apple-air-' + Date.now());
-
-    console.log('[SW] Showing notification:', title, '| tag:', tag);
+    const title = payload.notification?.title || payload.data?.title || 'Apple Air WiFi 🔔';
+    const body  = payload.notification?.body  || payload.data?.body  || 'You have a new notification';
+    const url   = payload.data?.url || 'https://vcheckair.vercel.app';
+    const tag   = payload.data?.tag || ('apple-air-' + Date.now());
 
     return self.registration.showNotification(title, {
-        body:               body,
+        body,
         icon:               '/icons/icon-192.png',
         badge:              '/icons/icon-192.png',
-        vibrate:            [200, 100, 200, 100, 200],
+        vibrate:            [200, 100, 200],
         requireInteraction: true,
-        tag:                tag,
+        tag,
         renotify:           true,
-        data:               { url: url }
+        data:               { url }
     });
 });
 
