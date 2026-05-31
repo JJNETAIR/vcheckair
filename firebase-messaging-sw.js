@@ -1,4 +1,3 @@
-// Firebase Messaging Service Worker
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
 
@@ -14,20 +13,21 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-    console.log('[SW] Background message received:', JSON.stringify(payload));
+    console.log('[SW] Background message:', JSON.stringify(payload));
 
-    const title = payload.notification?.title || 'Apple Air WiFi 🔔';
-    const body  = payload.notification?.body  || 'You have a new notification';
-    const url   = payload.data?.url  || 'https://vcheckair.vercel.app';
+    // Handle BOTH notification messages AND data-only messages
+    const title = payload.notification?.title 
+                || payload.data?.title 
+                || 'Apple Air WiFi 🔔';
+    
+    const body  = payload.notification?.body  
+                || payload.data?.body  
+                || 'You have a new notification';
+    
+    const url   = payload.data?.url   || 'https://vcheckair.vercel.app';
+    const tag   = payload.data?.tag   || ('apple-air-' + Date.now());
 
-    // Use unique tag from server — each notification type has unique tag
-    // broadcast: apple-air-broadcast-{timestamp}
-    // complaint: apple-air-sr-{srNumber}
-    // expiry:    apple-air-expiry-{voucherCode}
-    // fallback:  apple-air-{timestamp}
-    const tag = payload.data?.tag || ('apple-air-' + Date.now());
-
-    console.log('[SW] Showing notification with tag:', tag);
+    console.log('[SW] Showing notification:', title, '| tag:', tag);
 
     return self.registration.showNotification(title, {
         body:               body,
@@ -36,12 +36,11 @@ messaging.onBackgroundMessage((payload) => {
         vibrate:            [200, 100, 200, 100, 200],
         requireInteraction: true,
         tag:                tag,
-        renotify:           true,  // ✅ Always show — tags are unique so no spam
+        renotify:           true,
         data:               { url: url }
     });
 });
 
-// Handle notification click — open or focus app
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
     const url = event.notification.data?.url || 'https://vcheckair.vercel.app';
