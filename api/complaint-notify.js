@@ -50,7 +50,7 @@ export default async function handler(req, res) {
 }
 
 async function sendFCMv1(accessToken, token, title, body, srNumber) {
-    const tag = `apple-air-sr-${srNumber}`;
+    const tag = `apple-air-sr-${srNumber}-${type}-${Date.now()}`;
 
     const response = await fetch(
         `https://fcm.googleapis.com/v1/projects/${PROJECT_ID}/messages:send`,
