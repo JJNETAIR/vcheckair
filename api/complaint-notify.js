@@ -63,24 +63,22 @@ async function sendFCMv1(accessToken, token, title, body, srNumber) {
             body: JSON.stringify({
                 message: {
                     token,
-                    // ✅ DATA-ONLY message — forces SW to handle it
-                    // No 'notification' field = Chrome won't intercept it
-                    data: {
-                        title: title,
-                        body: body,
-                        tag: tag,
-                        url: 'https://vcheckair.vercel.app',
-                        type: 'complaint'
-                    },
+                    // notification field required for iOS
+                    notification: { title, body },
                     webpush: {
-                        headers: {
-                            'Urgency': 'high',
-                            'TTL': '86400'
+                        headers: { 'Urgency': 'high' },
+                        notification: {
+                            icon: 'https://vcheckair.vercel.app/icons/icon-192.png',
+                            badge: 'https://vcheckair.vercel.app/icons/icon-192.png',
+                            requireInteraction: true,
+                            vibrate: [200, 100, 200],
+                            tag: tag,
+                            renotify: true,
+                            click_action: 'https://vcheckair.vercel.app'
                         },
-                        fcm_options: {
-                            link: 'https://vcheckair.vercel.app'
-                        }
-                    }
+                        fcm_options: { link: 'https://vcheckair.vercel.app' }
+                    },
+                    data: { url: 'https://vcheckair.vercel.app', tag: tag }
                 }
             })
         }
