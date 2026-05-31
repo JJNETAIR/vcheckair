@@ -621,14 +621,6 @@
                     expiryText: foundVoucher.expiryText
                 };
 
-                // ✅ Save for My Voucher feature
-                saveMyVoucher(
-                    foundVoucher.code,
-                    foundVoucher.expiryText,
-                    foundVoucher.startTime,
-                    foundVoucher.userName || ''
-                );
-
                 const notifyBtn = document.getElementById('notify-me-btn');
                 if (notifyBtn) {
                     notifyBtn.onclick = () => setupFCMNotification(foundVoucher.code, foundVoucher.expiryText);
@@ -1385,6 +1377,9 @@
                                 })
                             });
                             console.log('✅ Token saved');
+
+                            // ✅ Save My Voucher — only when user clicks Notify Me
+                            saveMyVoucher(voucherCode, expiryText, '', '');
                         }
                     }
                 } catch(e) { console.log('Token save (non-critical):', e.message); }
@@ -1619,7 +1614,9 @@
             if (!container) return;
             container.classList.remove('hidden');
             if (subtitle && code) {
-                subtitle.textContent = `Code: ${code}`;
+                // Show masked code — last 4 digits only like •••• 6939
+                const masked = '•••• ' + String(code).slice(-4);
+                subtitle.textContent = masked;
             }
         }
 
@@ -1647,6 +1644,18 @@
 
         function openServiceForm() {
             document.getElementById('view-service').classList.remove('hidden');
+
+            // ✅ Auto-fill voucher code from My Voucher
+            const saved = localStorage.getItem('my_voucher');
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    const codeField = document.getElementById('svc-code');
+                    if (codeField && !codeField.value && data.code) {
+                        codeField.value = data.code;
+                    }
+                } catch(e) {}
+            }
             // Check notification permission state
             const banner = document.getElementById('complaint-notif-banner');
             const btn = document.getElementById('complaint-notif-btn');
