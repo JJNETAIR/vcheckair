@@ -588,6 +588,16 @@
                     // Hide notification section — no expiry date yet
                     document.getElementById('notification-section').classList.add('hidden');
 
+                    // ✅ Show progress bar at 0% for new voucher
+                    const progressSection = document.getElementById('progress-section');
+                    const progressBar = document.getElementById('progress-bar');
+                    const progressLabel = document.getElementById('progress-label');
+                    const progressPct = document.getElementById('progress-pct');
+                    if (progressSection) progressSection.classList.remove('hidden');
+                    if (progressBar) { progressBar.style.width = '0%'; progressBar.style.background = 'linear-gradient(90deg, #10B981, #34D399)'; }
+                    if (progressLabel) progressLabel.innerText = 'Day 0';
+                    if (progressPct) progressPct.innerText = '0% used';
+
                     // Show welcome banner
                     const existingBanner = document.getElementById('new-voucher-banner');
                     if (!existingBanner) {
@@ -644,6 +654,17 @@
                     document.getElementById('dash-data').className = 'text-xs font-semibold text-right max-w-[200px] text-rose-500';
                     document.getElementById('dash-speed').innerText = daysRemainingText;
                     document.getElementById('dash-speed').className = 'text-xs font-medium bg-rose-50 text-rose-500 px-3 py-1 rounded-md';
+
+                    // ✅ Show 100% progress bar for expired voucher
+                    const expSection = document.getElementById('progress-section');
+                    const expBar = document.getElementById('progress-bar');
+                    const expLabel = document.getElementById('progress-label');
+                    const expPct = document.getElementById('progress-pct');
+                    if (expSection) expSection.classList.remove('hidden');
+                    if (expBar) { expBar.style.background = 'linear-gradient(90deg, #F59E0B, #EF4444)'; setTimeout(() => { expBar.style.width = '100%'; }, 300); }
+                    if (expLabel) expLabel.innerText = 'Fully Used';
+                    if (expPct) expPct.innerText = '100% used';
+
                     renderView('view-dashboard');
                     return;
                 }
