@@ -86,7 +86,12 @@ async function sendFCMv1(accessToken, token, title, body, srNumber) {
         }
     );
     const result = await response.json();
-    if (!response.ok) throw new Error(JSON.stringify(result));
+    if (!response.ok) {
+        // Log the specific FCM error
+        const errCode = result?.error?.details?.[0]?.errorCode || result?.error?.status || 'UNKNOWN';
+        console.error('FCM error:', errCode, JSON.stringify(result));
+        throw new Error(JSON.stringify(result));
+    }
     return result;
 }
 
