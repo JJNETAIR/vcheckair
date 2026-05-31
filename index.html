@@ -1624,9 +1624,8 @@
                 let fcmToken = '';
                 try {
                     // Method 1: from localStorage (saved when Enable clicked)
-                    fcmToken = localStorage.getItem('complaint_fcm_token') || '';
-                    // Method 2: fresh token if permission granted
-                    if (!fcmToken && window.fcmMessaging && Notification.permission === 'granted') {
+                    // Always get fresh token — don't rely on cached token
+                    if (window.fcmMessaging && Notification.permission === 'granted') {
                         let swReg = null;
                         if ('serviceWorker' in navigator) {
                             try {
@@ -1638,6 +1637,9 @@
                         if (swReg) tokenOpts.serviceWorkerRegistration = swReg;
                         fcmToken = await window.fcmMessaging.getToken(tokenOpts) || '';
                         if (fcmToken) localStorage.setItem('complaint_fcm_token', fcmToken);
+                    } else {
+                        // Fallback: use cached token
+                        fcmToken = localStorage.getItem('complaint_fcm_token') || '';
                     }
                     console.log('FCM token:', fcmToken ? 'got it ✅' : 'empty ❌');
                 } catch(e) { console.log('FCM (non-critical):', e.message); }
