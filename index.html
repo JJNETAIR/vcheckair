@@ -563,11 +563,14 @@
                 }
 
                 // ── NEW UNACTIVATED VOUCHER ───────────────────────
+                // Always set code display first
+                document.getElementById('dash-code-display').innerText = foundVoucher.code;
+                document.getElementById('dash-user-text').innerText = foundVoucher.user || '--';
+
                 // If voucher exists in sheet but no startTime → not activated yet
                 const isNewVoucher = !foundVoucher.startTime || foundVoucher.startTime.trim() === '' || foundVoucher.startTime === '--';
 
                 if (isNewVoucher) {
-                    document.getElementById('dash-code-display').innerText = foundVoucher.code;
                     document.getElementById('dash-user-text').innerText = 'New Subscriber';
                     document.getElementById('status-icon-expired').classList.add('hidden');
                     document.getElementById('status-icon-active').classList.remove('hidden');
@@ -613,6 +616,7 @@
                 const oldBanner = document.getElementById('new-voucher-banner');
                 if (oldBanner) oldBanner.remove();
                 // ─────────────────────────────────────────────────
+                const sheetSaysValid = foundVoucher.status.includes('valid');
                 const today = new Date();
                 const expiryDate = parseSheetDateString(foundVoucher.expiryText);
                 let daysRemainingText = '--', isExpired = !sheetSaysValid;
@@ -626,10 +630,6 @@
                     else if (diffDays === 1) { daysRemainingText = 'Expires Tomorrow'; }
                     else { daysRemainingText = `${diffDays} Days`; }
                 }
-
-                // Populate dashboard
-                document.getElementById('dash-code-display').innerText = foundVoucher.code;
-                document.getElementById('dash-user-text').innerText = foundVoucher.user || '--';
 
                 if (isExpired) {
                     document.getElementById('notification-section').classList.add('hidden');
@@ -678,7 +678,7 @@
                 renderView('view-dashboard');
 
             } catch(err) {
-                console.error('Verification error:', err);
+                console.error('Verification error:', err.message, err.stack);
                 alert('Connection error. Please check your internet and try again.');
                 renderView('view-entry');
             }
