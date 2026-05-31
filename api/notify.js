@@ -35,10 +35,14 @@ export default async function handler(req, res) {
             return res.status(200).json({ success: true, message: 'No subscribers yet', sent: 0 });
         }
 
-        // Step 3: Find tomorrow's date
+        // Step 3: Find tomorrow's date — format as DD/MM/YYYY reliably
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = tomorrow.toLocaleDateString('en-GB'); // DD/MM/YYYY
+        // Use explicit formatting — don't rely on server locale
+        const dd = String(tomorrow.getUTCDate()).padStart(2, '0');
+        const mm = String(tomorrow.getUTCMonth() + 1).padStart(2, '0');
+        const yyyy = tomorrow.getUTCFullYear();
+        const tomorrowStr = `${dd}/${mm}/${yyyy}`;
 
         console.log('Looking for expiry date:', tomorrowStr);
 
