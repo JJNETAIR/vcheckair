@@ -1334,7 +1334,8 @@
                                     type: 'token',
                                     voucherCode: voucherCode.toUpperCase(),
                                     fcmToken: fcmToken,
-                                    expiryDate: cleanExpiryDate
+                                    expiryDate: cleanExpiryDate,
+                                    deviceId: getDeviceId()
                                 })
                             });
 
@@ -1346,7 +1347,8 @@
                                     type: 'subscriber',
                                     fcmToken: fcmToken,
                                     voucherCode: voucherCode.toUpperCase(),
-                                    subscribedAt: new Date().toLocaleDateString('en-GB')
+                                    subscribedAt: new Date().toLocaleDateString('en-GB'),
+                                    deviceId: getDeviceId()
                                 })
                             });
                             console.log('✅ Token saved');
@@ -1400,6 +1402,18 @@
         }
         // ── APPS SCRIPT URL ─────────────────────────────────────
         const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxRx3bHJiY_AmBBQWuTSBnEtiFi8K1rPUZp18LKpQbg1Xi3q_xYWNSrvrcFHUkeic85/exec';
+
+        // ── DEVICE ID — unique per physical device ────────────────
+        // localStorage is SHARED between Safari browser & PWA on iOS
+        // So both get same deviceId → Apps Script keeps only 1 row per device
+        function getDeviceId() {
+            let id = localStorage.getItem('apple_air_device_id');
+            if (!id) {
+                id = 'dev-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+                localStorage.setItem('apple_air_device_id', id);
+            }
+            return id;
+        }
 
         // ── FIREBASE ─────────────────────────────────────────────
         const firebaseConfig = {apiKey:"AIzaSyCJV-VOwwMqW5tCBROotu0U_Uju0PKyy8Q",authDomain:"apple-air.firebaseapp.com",projectId:"apple-air",storageBucket:"apple-air.firebasestorage.app",messagingSenderId:"714071308022",appId:"1:714071308022:web:c7d61d4df7f1693f3f5ed7"};
@@ -1524,7 +1538,8 @@
                                 type: 'subscriber',
                                 fcmToken: t,
                                 voucherCode: voucherCode,
-                                subscribedAt: new Date().toLocaleDateString('en-GB')
+                                subscribedAt: new Date().toLocaleDateString('en-GB'),
+                                deviceId: getDeviceId()
                             })
                         });
 
@@ -1537,7 +1552,8 @@
                                     type: 'token',
                                     fcmToken: t,
                                     voucherCode: voucherCode.toUpperCase(),
-                                    expiryDate: cleanExpiry
+                                    expiryDate: cleanExpiry,
+                                    deviceId: getDeviceId()
                                 })
                             });
                         }
