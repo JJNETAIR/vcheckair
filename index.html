@@ -634,9 +634,12 @@
                 if (expiryDate && !isNaN(expiryDate.getTime())) {
                     const diffMs = expiryDate.getTime() - today.getTime();
                     const diffHours = diffMs / (1000*60*60);
-                    const diffDays = Math.floor(diffMs / (1000*60*60*24));
+                    // Use calendar days — strip time component for accurate day count
+                    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                    const expiryMidnight = new Date(expiryDate.getFullYear(), expiryDate.getMonth(), expiryDate.getDate());
+                    const diffDays = Math.round((expiryMidnight - todayMidnight) / (1000*60*60*24));
                     if (diffMs <= 0) { daysRemainingText = 'Expired'; isExpired = true; }
-                    else if (diffHours < 24) { daysRemainingText = `Expires Today (${Math.ceil(diffHours)}h left)`; }
+                    else if (diffDays === 0) { daysRemainingText = `Expires Today (${Math.ceil(diffHours)}h left)`; }
                     else if (diffDays === 1) { daysRemainingText = 'Expires Tomorrow'; }
                     else { daysRemainingText = `${diffDays} Days`; }
                 }
